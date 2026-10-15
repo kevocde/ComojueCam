@@ -15,7 +15,7 @@ class SettingsPanel(
 ) : View(context) {
     var onClose: (() -> Unit)? = null
     var onApply: (() -> Unit)? = null
-    private val tabs = listOf("VIDEO", "RECORD")
+    private val tabs = listOf("VIDEO", "RECORD", "C. DETECTION")
     private var activeTab = 0
     private var pendingFrameRate = settings.frameRate
     private var pendingSize = settings.size
@@ -82,7 +82,7 @@ class SettingsPanel(
     }
 
     private fun drawTabs(canvas: Canvas, left: Float, top: Float, amber: Int) {
-        val tabWidth = 92f
+        val tabWidth = 110f
         tabs.forEachIndexed { index, title ->
             val tabLeft = left + 20f + index * (tabWidth + 8f)
             paint.style = if (index == activeTab) Paint.Style.FILL else Paint.Style.STROKE
@@ -98,10 +98,12 @@ class SettingsPanel(
         if (activeTab == 0) {
             drawFrameRateControl(canvas, top + 70f, left)
             drawQualityControl(canvas, top + 126f, left)
-        } else {
+        } else if (activeTab == 1) {
             drawLoopControl(canvas, top + 70f, left)
-            drawIncidentControl(canvas, top + 126f, left)
-            drawExtraCollisionControl(canvas, top + 182f, left)
+        }
+        if (activeTab == 2) {
+            drawIncidentControl(canvas, top + 70f, left)
+            drawExtraCollisionControl(canvas, top + 126f, left)
         }
     }
 
@@ -136,7 +138,7 @@ class SettingsPanel(
     }
 
     private fun drawExtraCollisionControl(canvas: Canvas, top: Float, left: Float) {
-        drawLabel(canvas, "EXTRA COLLITION TIME:", top, left)
+        drawLabel(canvas, "EXTRA TIME:", top, left)
         val controlLeft = left + 160f
         drawButton(canvas, "-", controlLeft, top, controlLeft + 42f, top + 40f, Color.rgb(255, 176, 0))
         drawValue(canvas, "${pendingExtraCollisionTime}s", controlLeft + 50f, top, controlLeft + 146f)
@@ -189,17 +191,19 @@ class SettingsPanel(
             activeTab == 0 && event.y in panelTop + 198f..panelTop + 238f -> changeQuality()
             activeTab == 0 && event.y in panelTop + 142f..panelTop + 182f -> changeFrameRate(event.x)
             activeTab == 1 && event.y in panelTop + 142f..panelTop + 182f -> changeLoop(event.x)
-            activeTab == 1 && event.y in panelTop + 198f..panelTop + 238f -> changeIncidentMultiplier()
-            activeTab == 1 && event.y in panelTop + 254f..panelTop + 294f -> changeExtraCollisionTime(event.x)
+            activeTab == 2 && event.y in panelTop + 142f..panelTop + 182f -> changeIncidentMultiplier()
+            activeTab == 2 && event.y in panelTop + 198f..panelTop + 238f -> changeExtraCollisionTime(event.x)
         }
         return true
     }
 
     private fun selectTab(x: Float) {
         val left = width * 0.12f + 20f
+        val tabWidth = 110f
         activeTab = when {
-            x in left..left + 92f -> 0
-            x in left + 100f..left + 192f -> 1
+            x in left..left + tabWidth -> 0
+            x in left + tabWidth + 8f..left + tabWidth * 2f + 8f -> 1
+            x in left + (tabWidth + 8f) * 2f..left + (tabWidth + 8f) * 2f + tabWidth -> 2
             else -> activeTab
         }
         invalidate()
