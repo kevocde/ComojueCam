@@ -282,7 +282,8 @@ private class SettingsPanel(
 ) : View(context) {
     var onClose: (() -> Unit)? = null
     var onApply: (() -> Unit)? = null
-    private val tabs = listOf("REC")
+    private val tabs = listOf("video", "record")
+    private var activeTab = 0
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = Typeface.MONOSPACE }
     private var pendingFrameRate = settings.frameRate
     private var pendingSize = settings.size
@@ -352,18 +353,22 @@ private class SettingsPanel(
         val tabWidth = 92f
         tabs.forEachIndexed { index, title ->
             val tabLeft = left + 20f + index * (tabWidth + 8f)
-            paint.style = Paint.Style.FILL
+            paint.style = if (index == activeTab) Paint.Style.FILL else Paint.Style.STROKE
             paint.color = amber
             canvas.drawRect(tabLeft, top, tabLeft + tabWidth, top + 38f, paint)
-            paint.color = Color.BLACK
+            paint.style = Paint.Style.FILL
+            paint.color = if (index == activeTab) Color.BLACK else amber
             paint.textSize = 15f
             paint.textAlign = Paint.Align.CENTER
             canvas.drawText(title, tabLeft + tabWidth / 2f, top + 25f, paint)
         }
 
-        drawFrameRateControl(canvas, top + 70f, left)
-        drawQualityControl(canvas, top + 126f, left)
-        drawLoopControl(canvas, top + 182f, left)
+        if (activeTab == 0) {
+            drawFrameRateControl(canvas, top + 70f, left)
+            drawQualityControl(canvas, top + 126f, left)
+        } else {
+            drawLoopControl(canvas, top + 70f, left)
+        }
     }
 
     private fun drawFrameRateControl(canvas: Canvas, top: Float, left: Float) {
@@ -428,7 +433,17 @@ private class SettingsPanel(
             } else if (hasChanges() && event.x in closeLeft - 106f..closeLeft - 10f &&
                 event.y in closeTop..closeTop + 38f) {
                 applyChanges()
-            } else if (event.y in panelTop + 72f + 126f..panelTop + 72f + 126f + 40f) {
+            } else if (event.y in panelTop + 72f..panelTop + 72f + 38f) {
+                val firstTabLeft = width * 0.12f + 20f
+                val tabWidth = 92f
+                activeTab = when {
+                    event.x in firstTabLeft..firstTabLeft + tabWidth -> 0
+                    event.x in firstTabLeft + tabWidth + 8f..firstTabLeft + tabWidth * 2f + 8f -> 1
+                    else -> activeTab
+                }
+                invalidate()
+            } else if (activeTab == 0 &&
+                event.y in panelTop + 72f + 126f..panelTop + 72f + 126f + 40f) {
                 val panelLeft = width * 0.12f
                 val controlLeft = panelLeft + 160f
                 if (event.x in controlLeft + 104f..controlLeft + 200f) {
@@ -443,7 +458,8 @@ private class SettingsPanel(
                     }
                     invalidate()
                 }
-            } else if (event.y in panelTop + 72f + 70f..panelTop + 72f + 70f + 40f) {
+            } else if (activeTab == 0 &&
+                event.y in panelTop + 72f + 70f..panelTop + 72f + 70f + 40f) {
                 val panelLeft = width * 0.12f
                 val controlLeft = panelLeft + 160f
                 if (event.x in controlLeft..controlLeft + 42f) {
@@ -457,7 +473,8 @@ private class SettingsPanel(
                     )]
                     invalidate()
                 }
-            } else if (event.y in panelTop + 72f + 182f..panelTop + 72f + 182f + 40f) {
+            } else if (activeTab == 1 &&
+                event.y in panelTop + 72f + 70f..panelTop + 72f + 70f + 40f) {
                 val panelLeft = width * 0.12f
                 val controlLeft = panelLeft + 160f
                 if (event.x in controlLeft..controlLeft + 42f) {
