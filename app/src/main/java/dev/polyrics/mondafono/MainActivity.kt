@@ -2,7 +2,7 @@ package dev.polyrics.mondafono
 
 import android.Manifest
 import android.app.Activity
-import android.app.AlertDialog
+import android.content.ContentValues
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Canvas
@@ -19,6 +19,7 @@ import android.media.MediaCodec
 import android.media.MediaCodecInfo
 import android.media.MediaFormat
 import android.media.MediaMuxer
+import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.os.Handler
@@ -30,7 +31,9 @@ import android.view.SurfaceView
 import android.view.View
 import android.widget.FrameLayout
 import android.util.Range
+import android.provider.MediaStore
 import java.io.File
+import java.io.FileDescriptor
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -39,6 +42,8 @@ import java.util.ArrayDeque
 class MainActivity : Activity() {
     private lateinit var camera: CameraController
     private lateinit var overlay: RetroOverlay
+    private lateinit var savePanel: SavePanel
+    private var pendingRecording: LoopRecording? = null
 
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
@@ -56,10 +61,13 @@ class MainActivity : Activity() {
         overlay = RetroOverlay(this)
         val recordingSettings = RecordingSettings()
         val settings = SettingsPanel(this, recordingSettings)
+        savePanel = SavePanel(this)
         settings.visibility = View.GONE
+        savePanel.visibility = View.GONE
         root.addView(preview, FrameLayout.LayoutParams(-1, -1))
         root.addView(overlay, FrameLayout.LayoutParams(-1, -1))
         root.addView(settings, FrameLayout.LayoutParams(-1, -1))
+        root.addView(savePanel, FrameLayout.LayoutParams(-1, -1))
         setContentView(root)
 
         camera = CameraController(this, preview.holder, recordingSettings) { recording ->
@@ -70,11 +78,13 @@ class MainActivity : Activity() {
             overlay.invalidate()
         }
         camera.onCapabilitiesChanged = { runOnUiThread(settings::syncFromSettings) }
-        camera.onRecordingReady = { recording -> runOnUiThread { showSaveDialog(recording) } }
+        camera.onRecordingReady = { recording -> runOnUiThread { showSavePanel(recording) } }
         overlay.onRecord = { camera.toggleRecording() }
         overlay.onSettings = { settings.visibility = View.VISIBLE }
         settings.onApply = { camera.applySettings() }
         settings.onClose = { settings.visibility = View.GONE }
+        savePanel.onSave = { savePendingRecording() }
+        savePanel.onDiscard = { discardPendingRecording() }
         preview.holder.addCallback(camera)
 
         if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
@@ -85,26 +95,76 @@ class MainActivity : Activity() {
     override fun onRequestPermissionsResult(request: Int, permissions: Array<out String>, results: IntArray) {
         super.onRequestPermissionsResult(request, permissions, results)
         if (request == 10 && results.firstOrNull() != PackageManager.PERMISSION_GRANTED) finish()
+        if (request == 20 && results.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
+            savePendingRecording()
+        }
     }
 
     override fun onDestroy() {
         if (::camera.isInitialized) camera.close()
+        pendingRecording?.release()
         super.onDestroy()
     }
 
-    private fun showSaveDialog(recording: LoopRecording) {
-        AlertDialog.Builder(this)
-            .setTitle("SAVE RECORDING?")
-            .setMessage("Save the last ${recording.durationSeconds} seconds?")
-            .setNegativeButton("DISCARD") { _, _ -> recording.release() }
-            .setPositiveButton("SAVE") { _, _ -> saveRecording(recording) }
-            .setOnCancelListener { recording.release() }
-            .show()
+    private fun showSavePanel(recording: LoopRecording) {
+        pendingRecording?.release()
+        pendingRecording = recording
+        savePanel.durationSeconds = recording.durationSeconds
+        savePanel.visibility = View.VISIBLE
     }
 
-    private fun saveRecording(recording: LoopRecording) {
-        val directory = getExternalFilesDir(Environment.DIRECTORY_MOVIES) ?: filesDir
-        recording.saveTo(File(directory, recording.fileName))
+    private fun savePendingRecording() {
+        val recording = pendingRecording ?: return
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
+            checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
+        ) {
+            requestPermissions(arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE), 20)
+            return
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            saveWithMediaStore(recording)
+        } else {
+            val directory = File(
+                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES),
+                "Mondafono"
+            )
+            directory.mkdirs()
+            recording.saveTo(File(directory, recording.fileName))
+            clearPendingRecording()
+        }
+    }
+
+    private fun saveWithMediaStore(recording: LoopRecording) {
+        val values = ContentValues().apply {
+            put(MediaStore.Video.Media.DISPLAY_NAME, recording.fileName)
+            put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
+            put(MediaStore.Video.Media.RELATIVE_PATH, "${Environment.DIRECTORY_MOVIES}/Mondafono")
+            put(MediaStore.Video.Media.IS_PENDING, 1)
+        }
+        val resolver = contentResolver
+        val uri = resolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values) ?: return
+        try {
+            val descriptor = resolver.openFileDescriptor(uri, "w")
+                ?: error("Unable to open video destination")
+            descriptor.use { recording.saveTo(it.fileDescriptor) }
+            resolver.update(uri, ContentValues().apply {
+                put(MediaStore.Video.Media.IS_PENDING, 0)
+            }, null, null)
+            clearPendingRecording()
+        } catch (_: Exception) {
+            resolver.delete(uri, null, null)
+        }
+    }
+
+    private fun clearPendingRecording() {
+        pendingRecording?.release()
+        pendingRecording = null
+        savePanel.visibility = View.GONE
+    }
+
+    private fun discardPendingRecording() {
+        clearPendingRecording()
     }
 }
 
@@ -376,6 +436,66 @@ private class SettingsPanel(
     }
 }
 
+private class SavePanel(context: Context) : View(context) {
+    var durationSeconds = 30
+    var onSave: (() -> Unit)? = null
+    var onDiscard: (() -> Unit)? = null
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = Typeface.MONOSPACE }
+
+    override fun onDraw(canvas: Canvas) {
+        val amber = Color.rgb(255, 176, 0)
+        canvas.drawColor(Color.argb(200, 0, 0, 0))
+
+        val left = width * 0.24f
+        val top = height * 0.32f
+        val right = width * 0.76f
+        val bottom = height * 0.68f
+        paint.style = Paint.Style.FILL
+        paint.color = Color.rgb(8, 8, 8)
+        canvas.drawRect(left, top, right, bottom, paint)
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 3f
+        paint.color = amber
+        canvas.drawRect(left, top, right, bottom, paint)
+
+        paint.style = Paint.Style.FILL
+        paint.textAlign = Paint.Align.CENTER
+        paint.textSize = 22f
+        canvas.drawText("SAVE RECORDING?", (left + right) / 2f, top + 48f, paint)
+        paint.textSize = 16f
+        canvas.drawText("LAST ${durationSeconds}s", (left + right) / 2f, top + 84f, paint)
+
+        drawButton(canvas, "SAVE", left + 42f, bottom - 62f, left + 152f, amber)
+        drawButton(canvas, "DISCARD", right - 152f, bottom - 62f, right - 42f, amber)
+    }
+
+    private fun drawButton(canvas: Canvas, label: String, left: Float, top: Float, right: Float, color: Int) {
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 2f
+        paint.color = color
+        canvas.drawRect(left, top, right, top + 40f, paint)
+        paint.style = Paint.Style.FILL
+        paint.textSize = 14f
+        canvas.drawText(label, (left + right) / 2f, top + 26f, paint)
+    }
+
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (event.action == MotionEvent.ACTION_UP) {
+            val left = width * 0.24f
+            val top = height * 0.32f
+            val right = width * 0.76f
+            val buttonTop = height * 0.68f - 62f
+            if (event.y in buttonTop..buttonTop + 40f) {
+                when {
+                    event.x in left + 42f..left + 152f -> onSave?.invoke()
+                    event.x in right - 152f..right - 42f -> onDiscard?.invoke()
+                }
+            }
+        }
+        return true
+    }
+}
+
 private class CameraController(
     private val context: Context,
     private val holder: SurfaceHolder,
@@ -555,7 +675,14 @@ private class LoopRecording(
 
     fun saveTo(file: File) {
         file.parentFile?.mkdirs()
-        val muxer = MediaMuxer(file.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+        saveToMuxer(MediaMuxer(file.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4))
+    }
+
+    fun saveTo(fileDescriptor: FileDescriptor) {
+        saveToMuxer(MediaMuxer(fileDescriptor, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4))
+    }
+
+    private fun saveToMuxer(muxer: MediaMuxer) {
         try {
             val track = muxer.addTrack(format)
             muxer.start()
