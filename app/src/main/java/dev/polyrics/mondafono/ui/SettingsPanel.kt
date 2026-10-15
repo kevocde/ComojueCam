@@ -82,9 +82,10 @@ class SettingsPanel(
     }
 
     private fun drawTabs(canvas: Canvas, left: Float, top: Float, amber: Int) {
-        val tabWidth = 110f
+        paint.textSize = 15f
+        var tabLeft = left + 20f
         tabs.forEachIndexed { index, title ->
-            val tabLeft = left + 20f + index * (tabWidth + 8f)
+            val tabWidth = tabWidth(title)
             paint.style = if (index == activeTab) Paint.Style.FILL else Paint.Style.STROKE
             paint.color = amber
             canvas.drawRect(tabLeft, top, tabLeft + tabWidth, top + 38f, paint)
@@ -93,6 +94,7 @@ class SettingsPanel(
             paint.textSize = 15f
             paint.textAlign = Paint.Align.CENTER
             canvas.drawText(title, tabLeft + tabWidth / 2f, top + 25f, paint)
+            tabLeft += tabWidth + 8f
         }
 
         if (activeTab == 0) {
@@ -198,15 +200,21 @@ class SettingsPanel(
     }
 
     private fun selectTab(x: Float) {
-        val left = width * 0.12f + 20f
-        val tabWidth = 110f
-        activeTab = when {
-            x in left..left + tabWidth -> 0
-            x in left + tabWidth + 8f..left + tabWidth * 2f + 8f -> 1
-            x in left + (tabWidth + 8f) * 2f..left + (tabWidth + 8f) * 2f + tabWidth -> 2
-            else -> activeTab
+        var tabLeft = width * 0.12f + 20f
+        tabs.forEachIndexed { index, title ->
+            val tabWidth = tabWidth(title)
+            if (x in tabLeft..tabLeft + tabWidth) {
+                activeTab = index
+                return@forEachIndexed
+            }
+            tabLeft += tabWidth + 8f
         }
         invalidate()
+    }
+
+    private fun tabWidth(title: String): Float {
+        paint.textSize = 15f
+        return maxOf(92f, paint.measureText(title) + 24f)
     }
 
     private fun changeQuality() {
