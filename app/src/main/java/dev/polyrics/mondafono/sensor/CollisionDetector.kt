@@ -5,6 +5,7 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.os.SystemClock
 import kotlin.math.sqrt
 
 class CollisionDetector(
@@ -17,12 +18,14 @@ class CollisionDetector(
     private val gravity = FloatArray(3)
     private var active = false
     private var gravityInitialized = false
-    private var thresholdReached = false
+    private var previousAcceleration = 0f
+    private var lastCollisionAt = 0L
 
     fun start() {
         if (active || accelerometer == null) return
         active = true
-        thresholdReached = false
+        previousAcceleration = 0f
+        lastCollisionAt = 0L
         gravityInitialized = false
         gravity.fill(0f)
         sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_GAME)
@@ -32,7 +35,7 @@ class CollisionDetector(
         if (!active) return
         sensorManager.unregisterListener(this)
         active = false
-        thresholdReached = false
+        previousAcceleration = 0f
         gravityInitialized = false
     }
 
@@ -53,20 +56,20 @@ class CollisionDetector(
         val acceleration = sqrt(linearX * linearX + linearY * linearY + linearZ * linearZ)
         onGForceChanged(acceleration / SensorManager.GRAVITY_EARTH)
         val threshold = 2.5f * SensorManager.GRAVITY_EARTH
+        val now = SystemClock.elapsedRealtime()
 
-        if (acceleration >= threshold) {
-            if (!thresholdReached) {
-                onCollision()
-            }
-            thresholdReached = true
-        } else if (acceleration < threshold * RESET_RATIO) {
-            thresholdReached = false
+        if (previousAcceleration >= threshold && previousAcceleration >= acceleration &&
+            now - lastCollisionAt >= MIN_COLLISION_INTERVAL_MS
+        ) {
+            lastCollisionAt = now
+            onCollision()
         }
+        previousAcceleration = acceleration
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
 
     private companion object {
-        const val RESET_RATIO = 0.8f
+        const val MIN_COLLISION_INTERVAL_MS = 500L
     }
 }
