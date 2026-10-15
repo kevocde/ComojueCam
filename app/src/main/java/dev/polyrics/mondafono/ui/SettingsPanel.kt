@@ -7,6 +7,7 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import android.view.MotionEvent
 import android.view.View
+import dev.polyrics.mondafono.recording.CollisionSensitivity
 import dev.polyrics.mondafono.recording.RecordingSettings
 
 class SettingsPanel(
@@ -15,27 +16,39 @@ class SettingsPanel(
 ) : View(context) {
     var onClose: (() -> Unit)? = null
     var onApply: (() -> Unit)? = null
-    private val tabs = listOf("VIDEO", "RECORD")
+    private val tabs = listOf("VIDEO", "RECORD", "C. DETECTION")
     private var activeTab = 0
     private var pendingFrameRate = settings.frameRate
     private var pendingSize = settings.size
     private var pendingLoopDuration = settings.loopDurationSeconds
+    private var pendingIncidentPostDuration = settings.incidentPostDurationSeconds
+    private var pendingExtraCollisionTime = settings.extraCollisionTimeSeconds
+    private var pendingCollisionSensitivity = settings.collisionSensitivity
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = Typeface.MONOSPACE }
 
     fun syncFromSettings() {
         pendingFrameRate = settings.frameRate
         pendingSize = settings.size
         pendingLoopDuration = settings.loopDurationSeconds
+        pendingIncidentPostDuration = settings.incidentPostDurationSeconds
+        pendingExtraCollisionTime = settings.extraCollisionTimeSeconds
+        pendingCollisionSensitivity = settings.collisionSensitivity
         invalidate()
     }
 
     private fun hasChanges() = pendingFrameRate != settings.frameRate ||
-        pendingSize != settings.size || pendingLoopDuration != settings.loopDurationSeconds
+        pendingSize != settings.size || pendingLoopDuration != settings.loopDurationSeconds ||
+        pendingIncidentPostDuration != settings.incidentPostDurationSeconds ||
+        pendingExtraCollisionTime != settings.extraCollisionTimeSeconds ||
+        pendingCollisionSensitivity != settings.collisionSensitivity
 
     private fun applyChanges() {
         settings.frameRate = pendingFrameRate
         settings.size = pendingSize
         settings.loopDurationSeconds = pendingLoopDuration
+        settings.incidentPostDurationSeconds = pendingIncidentPostDuration
+        settings.extraCollisionTimeSeconds = pendingExtraCollisionTime
+        settings.collisionSensitivity = pendingCollisionSensitivity
         onApply?.invoke()
         invalidate()
     }
@@ -74,9 +87,10 @@ class SettingsPanel(
     }
 
     private fun drawTabs(canvas: Canvas, left: Float, top: Float, amber: Int) {
-        val tabWidth = 92f
+        paint.textSize = 15f
+        var tabLeft = left + 20f
         tabs.forEachIndexed { index, title ->
-            val tabLeft = left + 20f + index * (tabWidth + 8f)
+            val tabWidth = tabWidth(title)
             paint.style = if (index == activeTab) Paint.Style.FILL else Paint.Style.STROKE
             paint.color = amber
             canvas.drawRect(tabLeft, top, tabLeft + tabWidth, top + 38f, paint)
@@ -85,13 +99,19 @@ class SettingsPanel(
             paint.textSize = 15f
             paint.textAlign = Paint.Align.CENTER
             canvas.drawText(title, tabLeft + tabWidth / 2f, top + 25f, paint)
+            tabLeft += tabWidth + 8f
         }
 
         if (activeTab == 0) {
             drawFrameRateControl(canvas, top + 70f, left)
             drawQualityControl(canvas, top + 126f, left)
-        } else {
+        } else if (activeTab == 1) {
             drawLoopControl(canvas, top + 70f, left)
+        }
+        if (activeTab == 2) {
+            drawPostTimeControl(canvas, top + 70f, left)
+            drawExtraCollisionControl(canvas, top + 126f, left)
+            drawSensitivityControl(canvas, top + 182f, left)
         }
     }
 
@@ -118,11 +138,34 @@ class SettingsPanel(
         drawButton(canvas, "+", controlLeft + 154f, top, controlLeft + 196f, top + 40f, Color.rgb(255, 176, 0))
     }
 
+    private fun drawPostTimeControl(canvas: Canvas, top: Float, left: Float) {
+        drawLabel(canvas, "R. TIME:", top, left)
+        val controlLeft = left + 160f
+        drawButton(canvas, "-", controlLeft, top, controlLeft + 42f, top + 40f, Color.rgb(255, 176, 0))
+        drawValue(canvas, "${pendingIncidentPostDuration}s", controlLeft + 50f, top, controlLeft + 146f)
+        drawButton(canvas, "+", controlLeft + 154f, top, controlLeft + 196f, top + 40f, Color.rgb(255, 176, 0))
+    }
+
+    private fun drawExtraCollisionControl(canvas: Canvas, top: Float, left: Float) {
+        drawLabel(canvas, "EXTRA TIME:", top, left)
+        val controlLeft = left + 160f
+        drawButton(canvas, "-", controlLeft, top, controlLeft + 42f, top + 40f, Color.rgb(255, 176, 0))
+        drawValue(canvas, "${pendingExtraCollisionTime}s", controlLeft + 50f, top, controlLeft + 146f)
+        drawButton(canvas, "+", controlLeft + 154f, top, controlLeft + 196f, top + 40f, Color.rgb(255, 176, 0))
+    }
+
+    private fun drawSensitivityControl(canvas: Canvas, top: Float, left: Float) {
+        drawLabel(canvas, "SENSITIVITY:", top, left)
+        val controlLeft = left + 160f
+        drawValue(canvas, pendingCollisionSensitivity.name, controlLeft, top, controlLeft + 96f)
+        drawButton(canvas, "CHANGE", controlLeft + 104f, top, controlLeft + 200f, top + 40f, Color.rgb(255, 176, 0))
+    }
+
     private fun drawLabel(canvas: Canvas, label: String, top: Float, left: Float) {
         paint.style = Paint.Style.FILL
         paint.color = Color.rgb(255, 176, 0)
         paint.textAlign = Paint.Align.LEFT
-        paint.textSize = 16f
+        paint.textSize = if (label.length > 12) 11f else 16f
         canvas.drawText(label, left + 28f, top + 28f, paint)
     }
 
@@ -164,18 +207,31 @@ class SettingsPanel(
             activeTab == 0 && event.y in panelTop + 198f..panelTop + 238f -> changeQuality()
             activeTab == 0 && event.y in panelTop + 142f..panelTop + 182f -> changeFrameRate(event.x)
             activeTab == 1 && event.y in panelTop + 142f..panelTop + 182f -> changeLoop(event.x)
+            activeTab == 2 && event.y in panelTop + 142f..panelTop + 182f -> changePostTime(event.x)
+            activeTab == 2 && event.y in panelTop + 198f..panelTop + 238f -> changeExtraCollisionTime(event.x)
+            activeTab == 2 && event.y in panelTop + 254f..panelTop + 294f -> changeSensitivity()
         }
         return true
     }
 
     private fun selectTab(x: Float) {
-        val left = width * 0.12f + 20f
-        activeTab = when {
-            x in left..left + 92f -> 0
-            x in left + 100f..left + 192f -> 1
-            else -> activeTab
+        var tabLeft = width * 0.12f + 20f
+        for (index in tabs.indices) {
+            val title = tabs[index]
+            val tabWidth = tabWidth(title)
+            if (x in tabLeft..tabLeft + tabWidth) {
+                activeTab = index
+                invalidate()
+                return
+            }
+            tabLeft += tabWidth + 8f
         }
         invalidate()
+    }
+
+    private fun tabWidth(title: String): Float {
+        paint.textSize = 15f
+        return maxOf(92f, paint.measureText(title) + 24f)
     }
 
     private fun changeQuality() {
@@ -207,6 +263,32 @@ class SettingsPanel(
             x in left + 154f..left + 196f -> (pendingLoopDuration + 10).coerceAtMost(120)
             else -> pendingLoopDuration
         }
+        invalidate()
+    }
+
+    private fun changePostTime(x: Float) {
+        val left = width * 0.12f + 160f
+        pendingIncidentPostDuration = when {
+            x in left..left + 42f -> (pendingIncidentPostDuration - 20).coerceAtLeast(30)
+            x in left + 154f..left + 196f -> (pendingIncidentPostDuration + 20).coerceAtMost(120)
+            else -> pendingIncidentPostDuration
+        }
+        invalidate()
+    }
+
+    private fun changeExtraCollisionTime(x: Float) {
+        val left = width * 0.12f + 160f
+        pendingExtraCollisionTime = when {
+            x in left..left + 42f -> (pendingExtraCollisionTime - 20).coerceAtLeast(20)
+            x in left + 154f..left + 196f -> (pendingExtraCollisionTime + 20).coerceAtMost(60)
+            else -> pendingExtraCollisionTime
+        }
+        invalidate()
+    }
+
+    private fun changeSensitivity() {
+        val options = CollisionSensitivity.entries
+        pendingCollisionSensitivity = options[(pendingCollisionSensitivity.ordinal + 1) % options.size]
         invalidate()
     }
 }

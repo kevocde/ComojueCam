@@ -16,6 +16,9 @@ class RetroOverlay(context: Context) : View(context) {
     var onSettings: (() -> Unit)? = null
     private var recording = false
     private var recordingStartedAt = 0L
+    private var gForce = 0f
+    private var collisionWarning = false
+    private var logMessage: String? = null
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = Typeface.MONOSPACE }
     private val timerRefresh = object : Runnable {
         override fun run() {
@@ -24,6 +27,10 @@ class RetroOverlay(context: Context) : View(context) {
                 postDelayed(this, 500L)
             }
         }
+    }
+    private val logClear = Runnable {
+        logMessage = null
+        invalidate()
     }
 
     fun setRecording(value: Boolean) {
@@ -34,8 +41,33 @@ class RetroOverlay(context: Context) : View(context) {
             post(timerRefresh)
         } else {
             removeCallbacks(timerRefresh)
+            gForce = 0f
+            collisionWarning = false
         }
         invalidate()
+    }
+
+    fun setGForce(value: Float) {
+        post {
+            gForce = value
+            invalidate()
+        }
+    }
+
+    fun setCollisionWarning(value: Boolean) {
+        post {
+            collisionWarning = value
+            invalidate()
+        }
+    }
+
+    fun showLog(message: String) {
+        post {
+            logMessage = message
+            removeCallbacks(logClear)
+            postDelayed(logClear, 4_000L)
+            invalidate()
+        }
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -43,20 +75,26 @@ class RetroOverlay(context: Context) : View(context) {
         drawSettingsButton(canvas, amber)
         drawRecordButton(canvas, amber)
         if (recording) drawRecordingStatus(canvas)
+        if (collisionWarning) drawCollisionWarning(canvas, amber)
+        drawLog(canvas)
     }
 
     private fun drawSettingsButton(canvas: Canvas, amber: Int) {
+        val left = width - 150f
+        val top = height - 83f
+        val right = width - 24f
+        val bottom = height - 37f
         paint.style = Paint.Style.FILL
         paint.color = Color.argb(220, 0, 0, 0)
-        canvas.drawRect(width - 150f, 24f, width - 24f, 70f, paint)
+        canvas.drawRect(left, top, right, bottom, paint)
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = 2f
         paint.color = if (settingsEnabled) amber else Color.DKGRAY
-        canvas.drawRect(width - 150f, 24f, width - 24f, 70f, paint)
+        canvas.drawRect(left, top, right, bottom, paint)
         paint.style = Paint.Style.FILL
         paint.textSize = 15f
         paint.textAlign = Paint.Align.CENTER
-        canvas.drawText("CONFIG", width - 87f, 53f, paint)
+        canvas.drawText("CONFIG", (left + right) / 2f, top + 29f, paint)
     }
 
     private fun drawRecordButton(canvas: Canvas, amber: Int) {
@@ -83,9 +121,37 @@ class RetroOverlay(context: Context) : View(context) {
         paint.textSize = 16f
         paint.textAlign = Paint.Align.LEFT
         if ((elapsedMillis / 500L) % 2L == 0L) {
+            paint.color = Color.RED
             canvas.drawText("* RECORDING", 32f, 48f, paint)
         }
-        canvas.drawText(formatElapsedTime(elapsedMillis / 1000L), 32f, 76f, paint)
+        paint.color = Color.WHITE
+        canvas.drawText("Time: ${formatElapsedTime(elapsedMillis / 1000L)}", 32f, 76f, paint)
+        paint.textSize = 16f
+        canvas.drawText(String.format(Locale.US, "G FORCE: %.1f", gForce), 32f, 104f, paint)
+    }
+
+    private fun drawCollisionWarning(canvas: Canvas, amber: Int) {
+        val elapsedMillis = SystemClock.elapsedRealtime() - recordingStartedAt
+        if ((elapsedMillis / 500L) % 2L != 0L) return
+        val left = (width - 300f) / 2f
+        val top = 82f
+        paint.style = Paint.Style.FILL
+        paint.color = amber
+        canvas.drawRect(left, top, left + 300f, top + 44f, paint)
+        paint.color = Color.BLACK
+        paint.textAlign = Paint.Align.CENTER
+        paint.textSize = 17f
+        canvas.drawText("COLLISION DETECTED", width / 2f, top + 28f, paint)
+    }
+
+    private fun drawLog(canvas: Canvas) {
+        val message = logMessage ?: return
+        paint.textSize = 16f
+        paint.textAlign = Paint.Align.RIGHT
+        val right = width - 24f
+        paint.style = Paint.Style.FILL
+        paint.color = Color.WHITE
+        canvas.drawText(message, right, 41f, paint)
     }
 
     private fun formatElapsedTime(seconds: Long): String = String.format(
@@ -98,7 +164,9 @@ class RetroOverlay(context: Context) : View(context) {
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         if (event.action == MotionEvent.ACTION_UP) {
-            if (settingsEnabled && event.x > width - 170f && event.y < 90f) {
+            if (settingsEnabled && event.x > width - 170f && event.y > height - 100f &&
+                event.y < height - 27f
+            ) {
                 onSettings?.invoke()
             } else if (event.y > height - 110f &&
                 event.x > width / 2f - 110f && event.x < width / 2f + 110f

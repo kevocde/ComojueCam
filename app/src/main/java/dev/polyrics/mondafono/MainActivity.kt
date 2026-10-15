@@ -7,11 +7,13 @@ import android.graphics.Color
 import android.os.Bundle
 import android.view.SurfaceView
 import android.view.View
+import android.view.WindowManager
 import android.widget.FrameLayout
 import dev.polyrics.mondafono.camera.CameraController
 import dev.polyrics.mondafono.recording.LoopRecording
 import dev.polyrics.mondafono.recording.RecordingSettings
 import dev.polyrics.mondafono.storage.RecordingStorage
+import dev.polyrics.mondafono.sound.CollisionSound
 import dev.polyrics.mondafono.ui.RetroOverlay
 import dev.polyrics.mondafono.ui.SavePanel
 import dev.polyrics.mondafono.ui.SettingsPanel
@@ -22,6 +24,7 @@ class MainActivity : Activity() {
     private lateinit var settingsPanel: SettingsPanel
     private lateinit var savePanel: SavePanel
     private lateinit var recordingStorage: RecordingStorage
+    private lateinit var collisionSound: CollisionSound
     private var pendingRecording: LoopRecording? = null
 
     override fun onCreate(state: Bundle?) {
@@ -34,6 +37,7 @@ class MainActivity : Activity() {
         settingsPanel = SettingsPanel(this, recordingSettings)
         savePanel = SavePanel(this)
         recordingStorage = RecordingStorage(this)
+        collisionSound = CollisionSound()
         settingsPanel.visibility = View.GONE
         savePanel.visibility = View.GONE
 
@@ -57,6 +61,21 @@ class MainActivity : Activity() {
         cameraController.onRecordingReady = { recording ->
             runOnUiThread { showSavePanel(recording) }
         }
+        cameraController.onIncidentReady = { recording ->
+            Thread {
+                try {
+                    val path = recordingStorage.save(recording)
+                    if (path != null) cameraOverlay.showLog("Stored in: $path")
+                } finally {
+                    recording.release()
+                }
+            }.start()
+        }
+        cameraController.onGForceChanged = cameraOverlay::setGForce
+        cameraController.onIncidentStateChanged = { active ->
+            cameraOverlay.setCollisionWarning(active)
+        }
+        cameraController.onCollisionDetected = { collisionSound.play() }
         cameraOverlay.onRecord = { cameraController.toggleRecording() }
         cameraOverlay.onSettings = { settingsPanel.visibility = View.VISIBLE }
         settingsPanel.onApply = { cameraController.applySettings() }
@@ -88,12 +107,16 @@ class MainActivity : Activity() {
 
     override fun onDestroy() {
         if (::cameraController.isInitialized) cameraController.close()
+        if (::collisionSound.isInitialized) collisionSound.release()
         pendingRecording?.release()
         super.onDestroy()
     }
 
     private fun configureFullscreenWindow() {
-        window.addFlags(8192 or 1024)
+        window.addFlags(
+            WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
+                WindowManager.LayoutParams.FLAG_FULLSCREEN
+        )
         window.decorView.systemUiVisibility =
             View.SYSTEM_UI_FLAG_FULLSCREEN or
                 View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
@@ -125,7 +148,11 @@ class MainActivity : Activity() {
             requestPermissions(arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE), STORAGE_PERMISSION_REQUEST)
             return
         }
-        if (recordingStorage.save(recording)) clearPendingRecording()
+        val path = recordingStorage.save(recording)
+        if (path != null) {
+            cameraOverlay.showLog("Stored in: $path")
+            clearPendingRecording()
+        }
     }
 
     private fun discardPendingRecording() {

@@ -16,8 +16,10 @@ import android.view.Surface
 import android.view.SurfaceHolder
 import dev.polyrics.mondafono.recording.LoopRecording
 import dev.polyrics.mondafono.recording.LoopVideoRecorder
+import dev.polyrics.mondafono.recording.RecordingStopResult
 import dev.polyrics.mondafono.recording.RecordingSettings
 import dev.polyrics.mondafono.recording.VideoSize
+import dev.polyrics.mondafono.sensor.CollisionDetector
 
 class CameraController(
     private val context: Context,
@@ -28,14 +30,22 @@ class CameraController(
     private val manager = context.getSystemService(CameraManager::class.java)
     private val thread = HandlerThread("camera").apply { start() }
     private val handler = Handler(thread.looper)
+    private val collisionDetector = CollisionDetector(context, ::handleCollision) { gForce ->
+        onGForceChanged?.invoke(gForce)
+    }
     private var camera: CameraDevice? = null
     private var session: CameraCaptureSession? = null
     private var recorder: LoopVideoRecorder? = null
-    private var recording = false
+    @Volatile private var recording = false
+    @Volatile private var incidentCaptureActive = false
     private var cameraId = ""
     private var frameRateRanges = emptyList<Range<Int>>()
     var onCapabilitiesChanged: (() -> Unit)? = null
     var onRecordingReady: ((LoopRecording) -> Unit)? = null
+    var onIncidentReady: ((LoopRecording) -> Unit)? = null
+    var onGForceChanged: ((Float) -> Unit)? = null
+    var onIncidentStateChanged: ((Boolean) -> Unit)? = null
+    var onCollisionDetected: (() -> Unit)? = null
 
     override fun surfaceCreated(holder: SurfaceHolder) {
         if (context.checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) open()
@@ -54,6 +64,7 @@ class CameraController(
 
     fun applySettings() {
         handler.post {
+            collisionDetector.setSensitivity(settings.collisionSensitivity.gForce)
             if (camera == null || recording || !holder.surface.isValid) return@post
             session?.close()
             createSession(null)
@@ -114,6 +125,7 @@ class CameraController(
     private fun startRecording() {
         if (camera == null || recording) return
         val size = settings.size
+        collisionDetector.setSensitivity(settings.collisionSensitivity.gForce)
         recorder = LoopVideoRecorder(
             size.width,
             size.height,
@@ -124,19 +136,30 @@ class CameraController(
         session?.close()
         createSession(recorder!!.inputSurface)
         recording = true
+        collisionDetector.start()
         state(true)
     }
 
     private fun stopRecording(resumePreview: Boolean = true, askToSave: Boolean = true) {
         if (!recording) return
+        val incidentWasActive = incidentCaptureActive
         recording = false
+        collisionDetector.stop()
+        incidentCaptureActive = false
+        onIncidentStateChanged?.invoke(false)
         state(false)
         session?.close()
         session = null
-        val finishedRecording = recorder?.stop()
+        val stopResult = recorder?.stop() ?: RecordingStopResult(null, emptyList())
         recorder = null
         if (resumePreview && holder.surface.isValid) createSession(null)
-        if (askToSave && finishedRecording != null) onRecordingReady?.invoke(finishedRecording)
+        if (!askToSave) return
+        if (incidentWasActive) {
+            stopResult.incidentRecordings.forEach { onIncidentReady?.invoke(it) }
+        } else {
+            stopResult.manualRecording?.let { onRecordingReady?.invoke(it) }
+            stopResult.incidentRecordings.forEach { onIncidentReady?.invoke(it) }
+        }
     }
 
     private fun createSession(encoder: Surface?) {
@@ -167,6 +190,27 @@ class CameraController(
     private fun selectedFrameRateRange(): Range<Int>? {
         return frameRateRanges.firstOrNull {
             settings.frameRate in it.lower..it.upper
+        }
+    }
+
+    private fun handleCollision() {
+        if (!recording) return
+        onCollisionDetected?.invoke()
+        val activeRecorder = recorder ?: return
+        if (incidentCaptureActive) {
+            activeRecorder.extendIncidentCapture(settings.extraCollisionTimeSeconds)
+            return
+        }
+        val preDuration = settings.loopDurationSeconds
+        val postDuration = settings.incidentPostDurationSeconds
+        val started = activeRecorder.startIncidentCapture(preDuration, postDuration) { incident ->
+            incidentCaptureActive = false
+            onIncidentStateChanged?.invoke(false)
+            onIncidentReady?.invoke(incident)
+        }
+        if (started) {
+            incidentCaptureActive = true
+            onIncidentStateChanged?.invoke(true)
         }
     }
 

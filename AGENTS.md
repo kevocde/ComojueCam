@@ -12,7 +12,13 @@ The application is landscape-only, fullscreen, and uses a minimal retro-style ov
 
 ## Repository Layout
 
-- `app/src/main/java/dev/polyrics/mondafono/MainActivity.kt`: activity, retro overlay, camera controller, and video encoder.
+- `app/src/main/java/dev/polyrics/mondafono/MainActivity.kt`: activity composition, permissions, and feature coordination.
+- `app/src/main/java/dev/polyrics/mondafono/camera/CameraController.kt`: Camera2 lifecycle and capture sessions.
+- `app/src/main/java/dev/polyrics/mondafono/recording/`: recording settings, MediaCodec buffer, and MP4 clips.
+- `app/src/main/java/dev/polyrics/mondafono/sensor/CollisionDetector.kt`: accelerometer-based collision detection.
+- `app/src/main/java/dev/polyrics/mondafono/sound/CollisionSound.kt`: generated collision alert tones.
+- `app/src/main/java/dev/polyrics/mondafono/storage/RecordingStorage.kt`: public video storage through MediaStore.
+- `app/src/main/java/dev/polyrics/mondafono/ui/`: native retro overlay and panels.
 - `app/src/main/AndroidManifest.xml`: camera permission, landscape activity, and launcher declaration.
 - `app/src/main/res/drawable/ic_launcher.xml`: minimal launcher icon.
 - `app/build.gradle.kts`: Android build configuration and release shrinking.
