@@ -2,6 +2,7 @@ package dev.polyrics.mondafono
 
 import android.Manifest
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Canvas
@@ -33,6 +34,7 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.ArrayDeque
 
 class MainActivity : Activity() {
     private lateinit var camera: CameraController
@@ -68,6 +70,7 @@ class MainActivity : Activity() {
             overlay.invalidate()
         }
         camera.onCapabilitiesChanged = { runOnUiThread(settings::syncFromSettings) }
+        camera.onRecordingReady = { recording -> runOnUiThread { showSaveDialog(recording) } }
         overlay.onRecord = { camera.toggleRecording() }
         overlay.onSettings = { settings.visibility = View.VISIBLE }
         settings.onApply = { camera.applySettings() }
@@ -87,6 +90,21 @@ class MainActivity : Activity() {
     override fun onDestroy() {
         if (::camera.isInitialized) camera.close()
         super.onDestroy()
+    }
+
+    private fun showSaveDialog(recording: LoopRecording) {
+        AlertDialog.Builder(this)
+            .setTitle("SAVE RECORDING?")
+            .setMessage("Save the last ${recording.durationSeconds} seconds?")
+            .setNegativeButton("DISCARD") { _, _ -> recording.release() }
+            .setPositiveButton("SAVE") { _, _ -> saveRecording(recording) }
+            .setOnCancelListener { recording.release() }
+            .show()
+    }
+
+    private fun saveRecording(recording: LoopRecording) {
+        val directory = getExternalFilesDir(Environment.DIRECTORY_MOVIES) ?: filesDir
+        recording.saveTo(File(directory, recording.fileName))
     }
 }
 
@@ -158,7 +176,7 @@ private class RecordingSettings {
     var frameRate = 30
     var supportedSizes = emptyList<VideoSize>()
     var size = VideoSize(1280, 720)
-
+    var loopDurationSeconds = 30
 }
 
 private class SettingsPanel(
@@ -171,18 +189,22 @@ private class SettingsPanel(
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = Typeface.MONOSPACE }
     private var pendingFrameRate = settings.frameRate
     private var pendingSize = settings.size
+    private var pendingLoopDuration = settings.loopDurationSeconds
 
     fun syncFromSettings() {
         pendingFrameRate = settings.frameRate
         pendingSize = settings.size
+        pendingLoopDuration = settings.loopDurationSeconds
         invalidate()
     }
 
-    private fun hasChanges() = pendingFrameRate != settings.frameRate || pendingSize != settings.size
+    private fun hasChanges() = pendingFrameRate != settings.frameRate ||
+        pendingSize != settings.size || pendingLoopDuration != settings.loopDurationSeconds
 
     private fun applyChanges() {
         settings.frameRate = pendingFrameRate
         settings.size = pendingSize
+        settings.loopDurationSeconds = pendingLoopDuration
         onApply?.invoke()
         invalidate()
     }
@@ -244,6 +266,7 @@ private class SettingsPanel(
 
         drawFrameRateControl(canvas, top + 70f, left)
         drawQualityControl(canvas, top + 126f, left)
+        drawLoopControl(canvas, top + 182f, left)
     }
 
     private fun drawFrameRateControl(canvas: Canvas, top: Float, left: Float) {
@@ -259,6 +282,14 @@ private class SettingsPanel(
         val controlLeft = left + 160f
         drawValue(canvas, pendingSize.toString(), controlLeft, top, controlLeft + 96f)
         drawButton(canvas, "CHANGE", controlLeft + 104f, top, controlLeft + 200f)
+    }
+
+    private fun drawLoopControl(canvas: Canvas, top: Float, left: Float) {
+        drawLabel(canvas, "LOOP:", top, left)
+        val controlLeft = left + 160f
+        drawButton(canvas, "-", controlLeft, top, controlLeft + 42f)
+        drawValue(canvas, "${pendingLoopDuration}s", controlLeft + 50f, top, controlLeft + 146f)
+        drawButton(canvas, "+", controlLeft + 154f, top, controlLeft + 196f)
     }
 
     private fun drawLabel(canvas: Canvas, label: String, top: Float, left: Float) {
@@ -329,6 +360,16 @@ private class SettingsPanel(
                     )]
                     invalidate()
                 }
+            } else if (event.y in panelTop + 72f + 182f..panelTop + 72f + 182f + 40f) {
+                val panelLeft = width * 0.12f
+                val controlLeft = panelLeft + 160f
+                if (event.x in controlLeft..controlLeft + 42f) {
+                    pendingLoopDuration = (pendingLoopDuration - 10).coerceAtLeast(20)
+                    invalidate()
+                } else if (event.x in controlLeft + 154f..controlLeft + 196f) {
+                    pendingLoopDuration = (pendingLoopDuration + 10).coerceAtMost(120)
+                    invalidate()
+                }
             }
         }
         return true
@@ -346,11 +387,12 @@ private class CameraController(
     private val handler = Handler(thread.looper)
     private var camera: CameraDevice? = null
     private var session: CameraCaptureSession? = null
-    private var recorder: VideoRecorder? = null
+    private var recorder: LoopVideoRecorder? = null
     private var recording = false
     private var cameraId = ""
     private var frameRateRanges = emptyList<Range<Int>>()
     var onCapabilitiesChanged: (() -> Unit)? = null
+    var onRecordingReady: ((LoopRecording) -> Unit)? = null
 
     override fun surfaceCreated(holder: SurfaceHolder) {
         if (context.checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) open()
@@ -358,7 +400,7 @@ private class CameraController(
 
     override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) = Unit
     override fun surfaceDestroyed(holder: SurfaceHolder) {
-        if (recording) stopRecording(false)
+        if (recording) stopRecording(false, false)
         closeCamera()
     }
 
@@ -422,12 +464,12 @@ private class CameraController(
     private fun startRecording() {
         if (camera == null || recording) return
         val size = settings.size
-        val directory = context.getExternalFilesDir(Environment.DIRECTORY_MOVIES) ?: context.filesDir
-        val output = File(
-            directory,
-            "mondafono-" + SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date()) + ".mp4"
+        recorder = LoopVideoRecorder(
+            size.width,
+            size.height,
+            settings.frameRate,
+            settings.loopDurationSeconds
         )
-        recorder = VideoRecorder(size.width, size.height, settings.frameRate, output)
         recorder!!.start()
         session?.close()
         createSession(recorder!!.inputSurface)
@@ -435,15 +477,16 @@ private class CameraController(
         state(true)
     }
 
-    private fun stopRecording(resumePreview: Boolean = true) {
+    private fun stopRecording(resumePreview: Boolean = true, askToSave: Boolean = true) {
         if (!recording) return
         recording = false
         state(false)
         session?.close()
         session = null
-        recorder?.stop()
+        val finishedRecording = recorder?.stop()
         recorder = null
         if (resumePreview && holder.surface.isValid) createSession(null)
+        if (askToSave && finishedRecording != null) onRecordingReady?.invoke(finishedRecording)
     }
 
     private fun createSession(encoder: Surface?) {
@@ -485,17 +528,61 @@ private class CameraController(
     }
 
     fun close() {
-        if (recording) stopRecording()
+        if (recording) stopRecording(false, false)
         closeCamera()
         thread.quitSafely()
     }
 }
 
-private class VideoRecorder(
+private data class EncodedSample(
+    val data: ByteArray,
+    val presentationTimeUs: Long,
+    val flags: Int
+)
+
+private class LoopRecording(
+    private val format: MediaFormat,
+    samples: Collection<EncodedSample>,
+    val durationSeconds: Int
+) {
+    val fileName = SimpleDateFormat("yyMMdd-HHmmss", Locale.US).format(Date()) + ".mp4"
+    private val samples = samples.toList().let { allSamples ->
+        val firstKeyFrame = allSamples.indexOfFirst {
+            it.flags and MediaCodec.BUFFER_FLAG_KEY_FRAME != 0
+        }
+        if (firstKeyFrame >= 0) allSamples.drop(firstKeyFrame) else allSamples
+    }.toMutableList()
+
+    fun saveTo(file: File) {
+        file.parentFile?.mkdirs()
+        val muxer = MediaMuxer(file.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+        try {
+            val track = muxer.addTrack(format)
+            muxer.start()
+            val startTimeUs = samples.firstOrNull()?.presentationTimeUs ?: 0L
+            samples.forEach { sample ->
+                val info = MediaCodec.BufferInfo().apply {
+                    set(0, sample.data.size, sample.presentationTimeUs - startTimeUs, sample.flags)
+                }
+                muxer.writeSampleData(track, java.nio.ByteBuffer.wrap(sample.data), info)
+            }
+            muxer.stop()
+        } finally {
+            muxer.release()
+            release()
+        }
+    }
+
+    fun release() {
+        samples.clear()
+    }
+}
+
+private class LoopVideoRecorder(
     private val width: Int,
     private val height: Int,
     private val frameRate: Int,
-    private val file: File
+    private val durationSeconds: Int
 ) {
     private val codec = MediaCodec.createEncoderByType("video/avc")
     private val format = MediaFormat.createVideoFormat("video/avc", width, height).apply {
@@ -504,10 +591,10 @@ private class VideoRecorder(
         setInteger(MediaFormat.KEY_FRAME_RATE, frameRate)
         setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
     }
-    private val muxer = MediaMuxer(file.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+    private val maxDurationUs = durationSeconds * 1_000_000L
+    private val samples = ArrayDeque<EncodedSample>()
     val inputSurface: Surface
-    private var track = -1
-    private var muxing = false
+    private var outputFormat: MediaFormat? = null
     private var thread: Thread? = null
 
     init {
@@ -522,17 +609,19 @@ private class VideoRecorder(
             while (true) {
                 when (val index = codec.dequeueOutputBuffer(info, 10_000)) {
                     MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
-                        track = muxer.addTrack(codec.outputFormat)
-                        muxer.start()
-                        muxing = true
+                        outputFormat = codec.outputFormat
                     }
                     MediaCodec.INFO_TRY_AGAIN_LATER -> Unit
                     else -> if (index >= 0) {
                         val buffer = codec.getOutputBuffer(index)
-                        if (muxing && info.size > 0 && buffer != null) {
+                        if (info.size > 0 && buffer != null &&
+                            info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG == 0
+                        ) {
                             buffer.position(info.offset)
-                            buffer.limit(info.offset + info.size)
-                            muxer.writeSampleData(track, buffer, info)
+                            val data = ByteArray(info.size)
+                            buffer.get(data)
+                            samples.addLast(EncodedSample(data, info.presentationTimeUs, info.flags))
+                            trimSamples(info.presentationTimeUs)
                         }
                         codec.releaseOutputBuffer(index, false)
                         if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) break
@@ -542,16 +631,24 @@ private class VideoRecorder(
         }.also { it.start() }
     }
 
-    fun stop() {
+    fun stop(): LoopRecording? {
+        var recording: LoopRecording? = null
         try {
             codec.signalEndOfInputStream()
             thread?.join()
+            outputFormat?.let { recording = LoopRecording(it, samples, durationSeconds) }
         } finally {
-            if (muxing) muxer.stop()
-            muxer.release()
             inputSurface.release()
             codec.stop()
             codec.release()
+        }
+        return recording
+    }
+
+    private fun trimSamples(latestPresentationTimeUs: Long) {
+        val cutoff = latestPresentationTimeUs - maxDurationUs
+        while (samples.size > 1 && samples.first().presentationTimeUs < cutoff) {
+            samples.removeFirst()
         }
     }
 }
