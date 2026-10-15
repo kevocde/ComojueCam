@@ -33,8 +33,8 @@ class CameraController(
     private var camera: CameraDevice? = null
     private var session: CameraCaptureSession? = null
     private var recorder: LoopVideoRecorder? = null
-    private var recording = false
-    private var incidentCaptureActive = false
+    @Volatile private var recording = false
+    @Volatile private var incidentCaptureActive = false
     private var cameraId = ""
     private var frameRateRanges = emptyList<Range<Int>>()
     var onCapabilitiesChanged: (() -> Unit)? = null
@@ -180,13 +180,13 @@ class CameraController(
     private fun handleCollision() {
         if (!recording || incidentCaptureActive) return
         val activeRecorder = recorder ?: return
-        incidentCaptureActive = true
         val preDuration = settings.loopDurationSeconds
         val postDuration = preDuration * settings.incidentMultiplier
-        activeRecorder.startIncidentCapture(preDuration, postDuration) { incident ->
+        val started = activeRecorder.startIncidentCapture(preDuration, postDuration) { incident ->
             incidentCaptureActive = false
             onIncidentReady?.invoke(incident)
         }
+        if (started) incidentCaptureActive = true
     }
 
     private fun closeCamera() {

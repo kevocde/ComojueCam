@@ -121,9 +121,9 @@ class LoopVideoRecorder(
         preDurationSeconds: Int,
         postDurationSeconds: Int,
         onComplete: (LoopRecording) -> Unit
-    ) {
+    ): Boolean {
         synchronized(bufferLock) {
-            val latestTimeUs = samples.lastOrNull()?.presentationTimeUs ?: return
+            val latestTimeUs = samples.lastOrNull()?.presentationTimeUs ?: return false
             val cutoff = latestTimeUs - preDurationSeconds * 1_000_000L
             val previousSamples = samples.filter { it.presentationTimeUs >= cutoff }
             incidentCaptures += IncidentCapture(
@@ -133,6 +133,7 @@ class LoopVideoRecorder(
                 onComplete
             )
         }
+        return true
     }
 
     fun stop(): LoopRecording? {
