@@ -1,4 +1,4 @@
-package dev.polyrics.mondafono
+package dev.polyrics.mondafono.recording
 
 import android.media.MediaCodec
 import android.media.MediaCodecInfo

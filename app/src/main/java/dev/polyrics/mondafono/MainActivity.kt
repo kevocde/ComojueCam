@@ -8,6 +8,13 @@ import android.os.Bundle
 import android.view.SurfaceView
 import android.view.View
 import android.widget.FrameLayout
+import dev.polyrics.mondafono.camera.CameraController
+import dev.polyrics.mondafono.recording.LoopRecording
+import dev.polyrics.mondafono.recording.RecordingSettings
+import dev.polyrics.mondafono.storage.RecordingStorage
+import dev.polyrics.mondafono.ui.RetroOverlay
+import dev.polyrics.mondafono.ui.SavePanel
+import dev.polyrics.mondafono.ui.SettingsPanel
 
 class MainActivity : Activity() {
     private lateinit var cameraController: CameraController

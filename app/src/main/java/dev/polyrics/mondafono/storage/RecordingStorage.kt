@@ -1,4 +1,4 @@
-package dev.polyrics.mondafono
+package dev.polyrics.mondafono.storage
 
 import android.content.ContentValues
 import android.content.Context
@@ -6,6 +6,7 @@ import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import java.io.File
+import dev.polyrics.mondafono.recording.LoopRecording
 
 class RecordingStorage(private val context: Context) {
     fun requiresLegacyPermission(): Boolean = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q

@@ -1,4 +1,4 @@
-package dev.polyrics.mondafono
+package dev.polyrics.mondafono.camera
 
 import android.Manifest
 import android.content.Context
@@ -14,6 +14,10 @@ import android.os.HandlerThread
 import android.util.Range
 import android.view.Surface
 import android.view.SurfaceHolder
+import dev.polyrics.mondafono.recording.LoopRecording
+import dev.polyrics.mondafono.recording.LoopVideoRecorder
+import dev.polyrics.mondafono.recording.RecordingSettings
+import dev.polyrics.mondafono.recording.VideoSize
 
 class CameraController(
     private val context: Context,

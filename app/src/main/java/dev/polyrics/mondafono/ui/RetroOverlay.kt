@@ -1,4 +1,4 @@
-package dev.polyrics.mondafono
+package dev.polyrics.mondafono.ui
 
 import android.content.Context
 import android.graphics.Canvas
