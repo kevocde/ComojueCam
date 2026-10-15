@@ -61,7 +61,8 @@ class MainActivity : Activity() {
         cameraController.onIncidentReady = { recording ->
             Thread {
                 try {
-                    recordingStorage.save(recording)
+                    val path = recordingStorage.save(recording)
+                    if (path != null) cameraOverlay.showLog("Saving: $path")
                 } finally {
                     recording.release()
                 }
@@ -140,7 +141,11 @@ class MainActivity : Activity() {
             requestPermissions(arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE), STORAGE_PERMISSION_REQUEST)
             return
         }
-        if (recordingStorage.save(recording)) clearPendingRecording()
+        val path = recordingStorage.save(recording)
+        if (path != null) {
+            cameraOverlay.showLog("Saving: $path")
+            clearPendingRecording()
+        }
     }
 
     private fun discardPendingRecording() {

@@ -18,6 +18,7 @@ class RetroOverlay(context: Context) : View(context) {
     private var recordingStartedAt = 0L
     private var gForce = 0f
     private var collisionWarning = false
+    private var logMessage: String? = null
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = Typeface.MONOSPACE }
     private val timerRefresh = object : Runnable {
         override fun run() {
@@ -26,6 +27,10 @@ class RetroOverlay(context: Context) : View(context) {
                 postDelayed(this, 500L)
             }
         }
+    }
+    private val logClear = Runnable {
+        logMessage = null
+        invalidate()
     }
 
     fun setRecording(value: Boolean) {
@@ -56,12 +61,22 @@ class RetroOverlay(context: Context) : View(context) {
         }
     }
 
+    fun showLog(message: String) {
+        post {
+            logMessage = message
+            removeCallbacks(logClear)
+            postDelayed(logClear, 4_000L)
+            invalidate()
+        }
+    }
+
     override fun onDraw(canvas: Canvas) {
         val amber = Color.rgb(255, 176, 0)
         drawSettingsButton(canvas, amber)
         drawRecordButton(canvas, amber)
         if (recording) drawRecordingStatus(canvas)
         if (collisionWarning) drawCollisionWarning(canvas, amber)
+        drawLog(canvas, amber)
     }
 
     private fun drawSettingsButton(canvas: Canvas, amber: Int) {
@@ -127,6 +142,23 @@ class RetroOverlay(context: Context) : View(context) {
         paint.textAlign = Paint.Align.CENTER
         paint.textSize = 17f
         canvas.drawText("COLLISION DETECTED", width / 2f, top + 28f, paint)
+    }
+
+    private fun drawLog(canvas: Canvas, amber: Int) {
+        val message = logMessage ?: return
+        paint.textSize = 12f
+        paint.textAlign = Paint.Align.RIGHT
+        val right = width - 24f
+        val left = (right - paint.measureText(message) - 20f).coerceAtLeast(12f)
+        paint.style = Paint.Style.FILL
+        paint.color = Color.argb(220, 0, 0, 0)
+        canvas.drawRect(left, 18f, right, 54f, paint)
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 2f
+        paint.color = amber
+        canvas.drawRect(left, 18f, right, 54f, paint)
+        paint.style = Paint.Style.FILL
+        canvas.drawText(message, right - 10f, 41f, paint)
     }
 
     private fun formatElapsedTime(seconds: Long): String = String.format(
