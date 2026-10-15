@@ -102,9 +102,11 @@ class RetroOverlay(context: Context) : View(context) {
         paint.textSize = 16f
         paint.textAlign = Paint.Align.LEFT
         if ((elapsedMillis / 500L) % 2L == 0L) {
+            paint.color = Color.RED
             canvas.drawText("* RECORDING", 32f, 48f, paint)
         }
-        canvas.drawText(formatElapsedTime(elapsedMillis / 1000L), 32f, 76f, paint)
+        paint.color = Color.WHITE
+        canvas.drawText("Time: ${formatElapsedTime(elapsedMillis / 1000L)}", 32f, 76f, paint)
         paint.textSize = 16f
         canvas.drawText(String.format(Locale.US, "G FORCE: %.1f", gForce), 32f, 104f, paint)
     }
