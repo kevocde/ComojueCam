@@ -234,10 +234,10 @@ private class RetroOverlay(context: Context) : View(context) {
             val elapsedSeconds = elapsedMillis / 1000L
             paint.textSize = 16f
             paint.textAlign = Paint.Align.LEFT
-            canvas.drawText(formatElapsedTime(elapsedSeconds), 32f, 48f, paint)
             if ((elapsedMillis / 500L) % 2L == 0L) {
-                canvas.drawText("* RECORDING", 118f, 48f, paint)
+                canvas.drawText("* RECORDING", 32f, 48f, paint)
             }
+            canvas.drawText(formatElapsedTime(elapsedSeconds), 32f, 76f, paint)
         }
     }
 
