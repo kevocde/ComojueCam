@@ -14,6 +14,7 @@ class RetroOverlay(context: Context) : View(context) {
     var settingsEnabled = true
     var onRecord: (() -> Unit)? = null
     var onSettings: (() -> Unit)? = null
+    var onInteraction: (() -> Unit)? = null
     private var recording = false
     private var recordingStartedAt = 0L
     private var gForce = 0f
@@ -163,6 +164,7 @@ class RetroOverlay(context: Context) : View(context) {
     )
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (event.action == MotionEvent.ACTION_DOWN) onInteraction?.invoke()
         if (event.action == MotionEvent.ACTION_UP) {
             if (settingsEnabled && event.x > width - 170f && event.y > height - 100f &&
                 event.y < height - 27f
