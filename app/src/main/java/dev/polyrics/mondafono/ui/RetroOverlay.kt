@@ -18,7 +18,6 @@ class RetroOverlay(context: Context) : View(context) {
     private var recordingStartedAt = 0L
     private var gForce = 0f
     private var collisionWarning = false
-    private var collisionWarningStartedAt = 0L
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = Typeface.MONOSPACE }
     private val timerRefresh = object : Runnable {
         override fun run() {
@@ -53,7 +52,6 @@ class RetroOverlay(context: Context) : View(context) {
     fun setCollisionWarning(value: Boolean) {
         post {
             collisionWarning = value
-            if (value) collisionWarningStartedAt = SystemClock.elapsedRealtime()
             invalidate()
         }
     }
@@ -112,7 +110,8 @@ class RetroOverlay(context: Context) : View(context) {
     }
 
     private fun drawCollisionWarning(canvas: Canvas, amber: Int) {
-        if ((SystemClock.elapsedRealtime() - collisionWarningStartedAt) / 500L % 2L != 0L) return
+        val elapsedMillis = SystemClock.elapsedRealtime() - recordingStartedAt
+        if ((elapsedMillis / 500L) % 2L != 0L) return
         val left = (width - 300f) / 2f
         val top = 82f
         paint.style = Paint.Style.FILL
