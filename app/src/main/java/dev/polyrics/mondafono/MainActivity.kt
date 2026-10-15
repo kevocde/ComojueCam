@@ -57,6 +57,15 @@ class MainActivity : Activity() {
         cameraController.onRecordingReady = { recording ->
             runOnUiThread { showSavePanel(recording) }
         }
+        cameraController.onIncidentReady = { recording ->
+            Thread {
+                try {
+                    recordingStorage.save(recording)
+                } finally {
+                    recording.release()
+                }
+            }.start()
+        }
         cameraOverlay.onRecord = { cameraController.toggleRecording() }
         cameraOverlay.onSettings = { settingsPanel.visibility = View.VISIBLE }
         settingsPanel.onApply = { cameraController.applySettings() }

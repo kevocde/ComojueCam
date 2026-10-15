@@ -20,22 +20,26 @@ class SettingsPanel(
     private var pendingFrameRate = settings.frameRate
     private var pendingSize = settings.size
     private var pendingLoopDuration = settings.loopDurationSeconds
+    private var pendingIncidentMultiplier = settings.incidentMultiplier
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = Typeface.MONOSPACE }
 
     fun syncFromSettings() {
         pendingFrameRate = settings.frameRate
         pendingSize = settings.size
         pendingLoopDuration = settings.loopDurationSeconds
+        pendingIncidentMultiplier = settings.incidentMultiplier
         invalidate()
     }
 
     private fun hasChanges() = pendingFrameRate != settings.frameRate ||
-        pendingSize != settings.size || pendingLoopDuration != settings.loopDurationSeconds
+        pendingSize != settings.size || pendingLoopDuration != settings.loopDurationSeconds ||
+        pendingIncidentMultiplier != settings.incidentMultiplier
 
     private fun applyChanges() {
         settings.frameRate = pendingFrameRate
         settings.size = pendingSize
         settings.loopDurationSeconds = pendingLoopDuration
+        settings.incidentMultiplier = pendingIncidentMultiplier
         onApply?.invoke()
         invalidate()
     }
@@ -92,6 +96,7 @@ class SettingsPanel(
             drawQualityControl(canvas, top + 126f, left)
         } else {
             drawLoopControl(canvas, top + 70f, left)
+            drawIncidentControl(canvas, top + 126f, left)
         }
     }
 
@@ -116,6 +121,13 @@ class SettingsPanel(
         drawButton(canvas, "-", controlLeft, top, controlLeft + 42f, top + 40f, Color.rgb(255, 176, 0))
         drawValue(canvas, "${pendingLoopDuration}s", controlLeft + 50f, top, controlLeft + 146f)
         drawButton(canvas, "+", controlLeft + 154f, top, controlLeft + 196f, top + 40f, Color.rgb(255, 176, 0))
+    }
+
+    private fun drawIncidentControl(canvas: Canvas, top: Float, left: Float) {
+        drawLabel(canvas, "INCIDENT:", top, left)
+        val controlLeft = left + 160f
+        drawValue(canvas, "x$pendingIncidentMultiplier", controlLeft, top, controlLeft + 96f)
+        drawButton(canvas, "CHANGE", controlLeft + 104f, top, controlLeft + 200f, top + 40f, Color.rgb(255, 176, 0))
     }
 
     private fun drawLabel(canvas: Canvas, label: String, top: Float, left: Float) {
@@ -164,6 +176,7 @@ class SettingsPanel(
             activeTab == 0 && event.y in panelTop + 198f..panelTop + 238f -> changeQuality()
             activeTab == 0 && event.y in panelTop + 142f..panelTop + 182f -> changeFrameRate(event.x)
             activeTab == 1 && event.y in panelTop + 142f..panelTop + 182f -> changeLoop(event.x)
+            activeTab == 1 && event.y in panelTop + 198f..panelTop + 238f -> changeIncidentMultiplier()
         }
         return true
     }
@@ -207,6 +220,11 @@ class SettingsPanel(
             x in left + 154f..left + 196f -> (pendingLoopDuration + 10).coerceAtMost(120)
             else -> pendingLoopDuration
         }
+        invalidate()
+    }
+
+    private fun changeIncidentMultiplier() {
+        pendingIncidentMultiplier = if (pendingIncidentMultiplier == 6) 2 else pendingIncidentMultiplier + 1
         invalidate()
     }
 }

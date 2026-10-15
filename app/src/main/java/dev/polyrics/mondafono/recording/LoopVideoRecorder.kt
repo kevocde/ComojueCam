@@ -22,9 +22,10 @@ data class EncodedSample(
 class LoopRecording(
     private val format: MediaFormat,
     samples: Collection<EncodedSample>,
-    val durationSeconds: Int
+    val durationSeconds: Int,
+    private val filePrefix: String = ""
 ) {
-    val fileName = SimpleDateFormat("yyMMdd-HHmmss", Locale.US).format(Date()) + ".mp4"
+    val fileName = filePrefix + SimpleDateFormat("yyMMdd-HHmmss", Locale.US).format(Date()) + ".mp4"
     private val samples = samples.toList().let { allSamples ->
         val firstKeyFrame = allSamples.indexOfFirst {
             it.flags and MediaCodec.BUFFER_FLAG_KEY_FRAME != 0
@@ -79,6 +80,8 @@ class LoopVideoRecorder(
     }
     private val maxDurationUs = durationSeconds * 1_000_000L
     private val samples = ArrayDeque<EncodedSample>()
+    private val bufferLock = Any()
+    private val incidentCaptures = mutableListOf<IncidentCapture>()
     val inputSurface: Surface
     private var outputFormat: MediaFormat? = null
     private var thread: Thread? = null
@@ -104,8 +107,7 @@ class LoopVideoRecorder(
                             buffer.position(info.offset)
                             val data = ByteArray(info.size)
                             buffer.get(data)
-                            samples.addLast(EncodedSample(data, info.presentationTimeUs, info.flags))
-                            trimSamples(info.presentationTimeUs)
+                            appendSample(EncodedSample(data, info.presentationTimeUs, info.flags))
                         }
                         codec.releaseOutputBuffer(index, false)
                         if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) break
@@ -115,13 +117,31 @@ class LoopVideoRecorder(
         }.also { it.start() }
     }
 
+    fun startIncidentCapture(
+        preDurationSeconds: Int,
+        postDurationSeconds: Int,
+        onComplete: (LoopRecording) -> Unit
+    ) {
+        synchronized(bufferLock) {
+            val latestTimeUs = samples.lastOrNull()?.presentationTimeUs ?: return
+            val cutoff = latestTimeUs - preDurationSeconds * 1_000_000L
+            val previousSamples = samples.filter { it.presentationTimeUs >= cutoff }
+            incidentCaptures += IncidentCapture(
+                previousSamples.toMutableList(),
+                latestTimeUs + postDurationSeconds * 1_000_000L,
+                preDurationSeconds + postDurationSeconds,
+                onComplete
+            )
+        }
+    }
+
     fun stop(): LoopRecording? {
         var recording: LoopRecording? = null
         try {
             codec.signalEndOfInputStream()
             thread?.join()
             outputFormat?.let {
-                val bufferedSamples = samples.toList().map { sample -> sample as EncodedSample }
+                val bufferedSamples = synchronized(bufferLock) { samples.toList() }
                 recording = LoopRecording(it, bufferedSamples, durationSeconds)
             }
         } finally {
@@ -136,6 +156,35 @@ class LoopVideoRecorder(
         val cutoff = latestPresentationTimeUs - maxDurationUs
         while (samples.size > 1 && samples.first().presentationTimeUs < cutoff) {
             samples.removeFirst()
+        }
+    }
+
+    private fun appendSample(sample: EncodedSample) {
+        val completedCaptures: List<IncidentCapture>
+        synchronized(bufferLock) {
+            samples.addLast(sample)
+            trimSamples(sample.presentationTimeUs)
+            completedCaptures = incidentCaptures.filter { it.append(sample) }
+            incidentCaptures.removeAll(completedCaptures.toSet())
+        }
+        completedCaptures.forEach { capture ->
+            outputFormat?.let {
+                capture.onComplete(
+                    LoopRecording(it, capture.samples, capture.durationSeconds, "incient_")
+                )
+            }
+        }
+    }
+
+    private class IncidentCapture(
+        val samples: MutableList<EncodedSample>,
+        private val endTimeUs: Long,
+        val durationSeconds: Int,
+        val onComplete: (LoopRecording) -> Unit
+    ) {
+        fun append(sample: EncodedSample): Boolean {
+            samples += sample
+            return sample.presentationTimeUs >= endTimeUs
         }
     }
 }

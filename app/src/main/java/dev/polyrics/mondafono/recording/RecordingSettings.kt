@@ -10,4 +10,5 @@ class RecordingSettings {
     var supportedSizes = emptyList<VideoSize>()
     var size = VideoSize(1280, 720)
     var loopDurationSeconds = 30
+    var incidentMultiplier = 2
 }
