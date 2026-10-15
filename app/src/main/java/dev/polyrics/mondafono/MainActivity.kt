@@ -61,14 +61,16 @@ class MainActivity : Activity() {
         setContentView(root)
 
         cameraController = CameraController(this, preview.holder, recordingSettings) { recording ->
-            recordingActive = recording
-            cameraOverlay.setRecording(recording)
-            idleOverlay.setRecording(recording)
-            cameraOverlay.settingsEnabled = !recording
-            settingsPanel.isEnabled = !recording
-            if (recording) settingsPanel.visibility = View.GONE
-            cameraOverlay.invalidate()
-            if (recording) resetInactivityTimer() else exitLowPowerMode()
+            runOnUiThread {
+                recordingActive = recording
+                cameraOverlay.setRecording(recording)
+                idleOverlay.setRecording(recording)
+                cameraOverlay.settingsEnabled = !recording
+                settingsPanel.isEnabled = !recording
+                if (recording) settingsPanel.visibility = View.GONE
+                cameraOverlay.invalidate()
+                if (recording) resetInactivityTimer() else exitLowPowerMode()
+            }
         }
         cameraController.onCapabilitiesChanged = {
             runOnUiThread(settingsPanel::syncFromSettings)

@@ -28,24 +28,30 @@ class IdleRecordingOverlay(context: Context) : View(context) {
     }
 
     fun setRecording(value: Boolean) {
-        recording = value
-        if (value) {
-            startedAt = SystemClock.elapsedRealtime()
-            post(refresh)
-        } else {
-            removeCallbacks(refresh)
+        post {
+            recording = value
+            if (value) {
+                startedAt = SystemClock.elapsedRealtime()
+                post(refresh)
+            } else {
+                removeCallbacks(refresh)
+            }
+            invalidate()
         }
-        invalidate()
     }
 
     fun setGForce(value: Float) {
-        gForce = value
-        invalidate()
+        post {
+            gForce = value
+            invalidate()
+        }
     }
 
     fun setCollisionWarning(value: Boolean) {
-        collisionWarning = value
-        invalidate()
+        post {
+            collisionWarning = value
+            invalidate()
+        }
     }
 
     override fun onDraw(canvas: Canvas) {
