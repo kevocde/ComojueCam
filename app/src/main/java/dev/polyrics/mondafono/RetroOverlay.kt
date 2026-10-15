@@ -1,0 +1,111 @@
+package dev.polyrics.mondafono
+
+import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Typeface
+import android.os.SystemClock
+import android.view.MotionEvent
+import android.view.View
+import java.util.Locale
+
+class RetroOverlay(context: Context) : View(context) {
+    var settingsEnabled = true
+    var onRecord: (() -> Unit)? = null
+    var onSettings: (() -> Unit)? = null
+    private var recording = false
+    private var recordingStartedAt = 0L
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = Typeface.MONOSPACE }
+    private val timerRefresh = object : Runnable {
+        override fun run() {
+            if (recording) {
+                invalidate()
+                postDelayed(this, 500L)
+            }
+        }
+    }
+
+    fun setRecording(value: Boolean) {
+        if (recording == value) return
+        recording = value
+        if (value) {
+            recordingStartedAt = SystemClock.elapsedRealtime()
+            post(timerRefresh)
+        } else {
+            removeCallbacks(timerRefresh)
+        }
+        invalidate()
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        val amber = Color.rgb(255, 176, 0)
+        drawSettingsButton(canvas, amber)
+        drawRecordButton(canvas, amber)
+        if (recording) drawRecordingStatus(canvas)
+    }
+
+    private fun drawSettingsButton(canvas: Canvas, amber: Int) {
+        paint.style = Paint.Style.FILL
+        paint.color = Color.argb(220, 0, 0, 0)
+        canvas.drawRect(width - 150f, 24f, width - 24f, 70f, paint)
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 2f
+        paint.color = if (settingsEnabled) amber else Color.DKGRAY
+        canvas.drawRect(width - 150f, 24f, width - 24f, 70f, paint)
+        paint.style = Paint.Style.FILL
+        paint.textSize = 15f
+        paint.textAlign = Paint.Align.CENTER
+        canvas.drawText("CONFIG", width - 87f, 53f, paint)
+    }
+
+    private fun drawRecordButton(canvas: Canvas, amber: Int) {
+        val buttonWidth = 190f
+        val buttonHeight = 64f
+        val left = (width - buttonWidth) / 2f
+        val top = height - buttonHeight - 28f
+        paint.style = Paint.Style.FILL
+        paint.color = Color.argb(220, 0, 0, 0)
+        canvas.drawRect(left, top, left + buttonWidth, top + buttonHeight, paint)
+        paint.style = Paint.Style.STROKE
+        paint.color = if (recording) Color.RED else amber
+        paint.strokeWidth = 3f
+        canvas.drawRect(left, top, left + buttonWidth, top + buttonHeight, paint)
+        paint.style = Paint.Style.FILL
+        paint.textSize = 22f
+        paint.textAlign = Paint.Align.CENTER
+        paint.color = if (recording) Color.RED else amber
+        canvas.drawText(if (recording) "STOP" else "REC", width / 2f, top + 40f, paint)
+    }
+
+    private fun drawRecordingStatus(canvas: Canvas) {
+        val elapsedMillis = SystemClock.elapsedRealtime() - recordingStartedAt
+        paint.textSize = 16f
+        paint.textAlign = Paint.Align.LEFT
+        if ((elapsedMillis / 500L) % 2L == 0L) {
+            canvas.drawText("* RECORDING", 32f, 48f, paint)
+        }
+        canvas.drawText(formatElapsedTime(elapsedMillis / 1000L), 32f, 76f, paint)
+    }
+
+    private fun formatElapsedTime(seconds: Long): String = String.format(
+        Locale.US,
+        "%02d:%02d:%02d",
+        seconds / 3_600,
+        seconds / 60 % 60,
+        seconds % 60
+    )
+
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (event.action == MotionEvent.ACTION_UP) {
+            if (settingsEnabled && event.x > width - 170f && event.y < 90f) {
+                onSettings?.invoke()
+            } else if (event.y > height - 110f &&
+                event.x > width / 2f - 110f && event.x < width / 2f + 110f
+            ) {
+                onRecord?.invoke()
+            }
+        }
+        return true
+    }
+}
