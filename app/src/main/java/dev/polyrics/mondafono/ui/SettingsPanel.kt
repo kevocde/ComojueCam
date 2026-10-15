@@ -201,11 +201,13 @@ class SettingsPanel(
 
     private fun selectTab(x: Float) {
         var tabLeft = width * 0.12f + 20f
-        tabs.forEachIndexed { index, title ->
+        for (index in tabs.indices) {
+            val title = tabs[index]
             val tabWidth = tabWidth(title)
             if (x in tabLeft..tabLeft + tabWidth) {
                 activeTab = index
-                return@forEachIndexed
+                invalidate()
+                return
             }
             tabLeft += tabWidth + 8f
         }
