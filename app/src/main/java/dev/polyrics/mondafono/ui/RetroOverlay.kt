@@ -146,7 +146,7 @@ class RetroOverlay(context: Context) : View(context) {
 
     private fun drawLog(canvas: Canvas) {
         val message = logMessage ?: return
-        paint.textSize = 12f
+        paint.textSize = 16f
         paint.textAlign = Paint.Align.RIGHT
         val right = width - 24f
         paint.style = Paint.Style.FILL
