@@ -64,6 +64,7 @@ class CameraController(
 
     fun applySettings() {
         handler.post {
+            collisionDetector.setSensitivity(settings.collisionSensitivity.gForce)
             if (camera == null || recording || !holder.surface.isValid) return@post
             session?.close()
             createSession(null)
@@ -124,6 +125,7 @@ class CameraController(
     private fun startRecording() {
         if (camera == null || recording) return
         val size = settings.size
+        collisionDetector.setSensitivity(settings.collisionSensitivity.gForce)
         recorder = LoopVideoRecorder(
             size.width,
             size.height,
@@ -200,7 +202,7 @@ class CameraController(
             return
         }
         val preDuration = settings.loopDurationSeconds
-        val postDuration = preDuration * settings.incidentMultiplier
+        val postDuration = settings.incidentPostDurationSeconds
         val started = activeRecorder.startIncidentCapture(preDuration, postDuration) { incident ->
             incidentCaptureActive = false
             onIncidentStateChanged?.invoke(false)

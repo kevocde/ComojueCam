@@ -20,6 +20,11 @@ class CollisionDetector(
     private var gravityInitialized = false
     private var previousAcceleration = 0f
     private var lastCollisionAt = 0L
+    private var sensitivityGForce = 2.5f
+
+    fun setSensitivity(gForce: Float) {
+        sensitivityGForce = gForce
+    }
 
     fun start() {
         if (active || accelerometer == null) return
@@ -55,7 +60,7 @@ class CollisionDetector(
         val linearZ = event.values[2] - gravity[2]
         val acceleration = sqrt(linearX * linearX + linearY * linearY + linearZ * linearZ)
         onGForceChanged(acceleration / SensorManager.GRAVITY_EARTH)
-        val threshold = 2.5f * SensorManager.GRAVITY_EARTH
+        val threshold = sensitivityGForce * SensorManager.GRAVITY_EARTH
         val now = SystemClock.elapsedRealtime()
 
         if (previousAcceleration >= threshold && previousAcceleration >= acceleration &&
