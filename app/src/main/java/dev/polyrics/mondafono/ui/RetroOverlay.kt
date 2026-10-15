@@ -65,17 +65,21 @@ class RetroOverlay(context: Context) : View(context) {
     }
 
     private fun drawSettingsButton(canvas: Canvas, amber: Int) {
+        val left = width - 150f
+        val top = height - 92f
+        val right = width - 24f
+        val bottom = height - 46f
         paint.style = Paint.Style.FILL
         paint.color = Color.argb(220, 0, 0, 0)
-        canvas.drawRect(width - 150f, 24f, width - 24f, 70f, paint)
+        canvas.drawRect(left, top, right, bottom, paint)
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = 2f
         paint.color = if (settingsEnabled) amber else Color.DKGRAY
-        canvas.drawRect(width - 150f, 24f, width - 24f, 70f, paint)
+        canvas.drawRect(left, top, right, bottom, paint)
         paint.style = Paint.Style.FILL
         paint.textSize = 15f
         paint.textAlign = Paint.Align.CENTER
-        canvas.drawText("CONFIG", width - 87f, 53f, paint)
+        canvas.drawText("CONFIG", (left + right) / 2f, top + 29f, paint)
     }
 
     private fun drawRecordButton(canvas: Canvas, amber: Int) {
@@ -135,7 +139,9 @@ class RetroOverlay(context: Context) : View(context) {
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         if (event.action == MotionEvent.ACTION_UP) {
-            if (settingsEnabled && event.x > width - 170f && event.y < 90f) {
+            if (settingsEnabled && event.x > width - 170f && event.y > height - 110f &&
+                event.y < height - 28f
+            ) {
                 onSettings?.invoke()
             } else if (event.y > height - 110f &&
                 event.x > width / 2f - 110f && event.x < width / 2f + 110f
