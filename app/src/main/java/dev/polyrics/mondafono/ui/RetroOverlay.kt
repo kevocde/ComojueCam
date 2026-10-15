@@ -158,6 +158,7 @@ class RetroOverlay(context: Context) : View(context) {
         paint.color = amber
         canvas.drawRect(left, 18f, right, 54f, paint)
         paint.style = Paint.Style.FILL
+        paint.color = Color.WHITE
         canvas.drawText(message, right - 10f, 41f, paint)
     }
 

@@ -62,7 +62,7 @@ class MainActivity : Activity() {
             Thread {
                 try {
                     val path = recordingStorage.save(recording)
-                    if (path != null) cameraOverlay.showLog("Saving: $path")
+                    if (path != null) cameraOverlay.showLog("Stored in: $path")
                 } finally {
                     recording.release()
                 }
@@ -143,7 +143,7 @@ class MainActivity : Activity() {
         }
         val path = recordingStorage.save(recording)
         if (path != null) {
-            cameraOverlay.showLog("Saving: $path")
+            cameraOverlay.showLog("Stored in: $path")
             clearPendingRecording()
         }
     }
