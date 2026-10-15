@@ -1,7 +1,9 @@
 package dev.polyrics.mondafono.storage
 
+import android.Manifest
 import android.content.ContentValues
 import android.content.Context
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
@@ -16,6 +18,11 @@ class RecordingStorage(private val context: Context) {
     }
 
     private fun saveLegacy(recording: LoopRecording): Boolean {
+        if (context.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            return false
+        }
         val directory = File(
             Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES),
             "Mondafono"
