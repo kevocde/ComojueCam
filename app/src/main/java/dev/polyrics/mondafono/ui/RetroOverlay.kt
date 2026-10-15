@@ -83,7 +83,7 @@ class RetroOverlay(context: Context) : View(context) {
         val left = width - 150f
         val top = height - 92f
         val right = width - 24f
-        val bottom = height - 46f
+        val bottom = height - 28f
         paint.style = Paint.Style.FILL
         paint.color = Color.argb(220, 0, 0, 0)
         canvas.drawRect(left, top, right, bottom, paint)
@@ -165,7 +165,7 @@ class RetroOverlay(context: Context) : View(context) {
     override fun onTouchEvent(event: MotionEvent): Boolean {
         if (event.action == MotionEvent.ACTION_UP) {
             if (settingsEnabled && event.x > width - 170f && event.y > height - 110f &&
-                event.y < height - 28f
+                event.y < height - 18f
             ) {
                 onSettings?.invoke()
             } else if (event.y > height - 110f &&
