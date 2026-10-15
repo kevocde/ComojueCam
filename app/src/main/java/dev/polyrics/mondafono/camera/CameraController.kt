@@ -29,7 +29,9 @@ class CameraController(
     private val manager = context.getSystemService(CameraManager::class.java)
     private val thread = HandlerThread("camera").apply { start() }
     private val handler = Handler(thread.looper)
-    private val collisionDetector = CollisionDetector(context, ::handleCollision)
+    private val collisionDetector = CollisionDetector(context, ::handleCollision) { gForce ->
+        onGForceChanged?.invoke(gForce)
+    }
     private var camera: CameraDevice? = null
     private var session: CameraCaptureSession? = null
     private var recorder: LoopVideoRecorder? = null
@@ -40,6 +42,8 @@ class CameraController(
     var onCapabilitiesChanged: (() -> Unit)? = null
     var onRecordingReady: ((LoopRecording) -> Unit)? = null
     var onIncidentReady: ((LoopRecording) -> Unit)? = null
+    var onGForceChanged: ((Float) -> Unit)? = null
+    var onIncidentStateChanged: ((Boolean) -> Unit)? = null
 
     override fun surfaceCreated(holder: SurfaceHolder) {
         if (context.checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) open()
@@ -137,6 +141,7 @@ class CameraController(
         recording = false
         collisionDetector.stop()
         incidentCaptureActive = false
+        onIncidentStateChanged?.invoke(false)
         state(false)
         session?.close()
         session = null
@@ -188,9 +193,13 @@ class CameraController(
         val postDuration = preDuration * settings.incidentMultiplier
         val started = activeRecorder.startIncidentCapture(preDuration, postDuration) { incident ->
             incidentCaptureActive = false
+            onIncidentStateChanged?.invoke(false)
             onIncidentReady?.invoke(incident)
         }
-        if (started) incidentCaptureActive = true
+        if (started) {
+            incidentCaptureActive = true
+            onIncidentStateChanged?.invoke(true)
+        }
     }
 
     private fun closeCamera() {

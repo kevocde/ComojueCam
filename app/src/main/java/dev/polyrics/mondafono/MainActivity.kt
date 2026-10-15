@@ -66,6 +66,8 @@ class MainActivity : Activity() {
                 }
             }.start()
         }
+        cameraController.onGForceChanged = cameraOverlay::setGForce
+        cameraController.onIncidentStateChanged = cameraOverlay::setCollisionWarning
         cameraOverlay.onRecord = { cameraController.toggleRecording() }
         cameraOverlay.onSettings = { settingsPanel.visibility = View.VISIBLE }
         settingsPanel.onApply = { cameraController.applySettings() }

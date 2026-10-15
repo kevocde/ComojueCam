@@ -10,7 +10,8 @@ import kotlin.math.sqrt
 
 class CollisionDetector(
     context: Context,
-    private val onCollision: () -> Unit
+    private val onCollision: () -> Unit,
+    private val onGForceChanged: (Float) -> Unit
 ) : SensorEventListener {
     private val sensorManager = context.getSystemService(SensorManager::class.java)
     private val accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
@@ -52,6 +53,7 @@ class CollisionDetector(
         val linearY = event.values[1] - gravity[1]
         val linearZ = event.values[2] - gravity[2]
         val acceleration = sqrt(linearX * linearX + linearY * linearY + linearZ * linearZ)
+        onGForceChanged(acceleration / SensorManager.GRAVITY_EARTH)
         val threshold = 2.5f * SensorManager.GRAVITY_EARTH
         val now = SystemClock.elapsedRealtime()
 
