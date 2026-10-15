@@ -7,6 +7,7 @@ import android.graphics.Color
 import android.os.Bundle
 import android.view.SurfaceView
 import android.view.View
+import android.view.WindowManager
 import android.widget.FrameLayout
 import dev.polyrics.mondafono.camera.CameraController
 import dev.polyrics.mondafono.recording.LoopRecording
@@ -104,7 +105,10 @@ class MainActivity : Activity() {
     }
 
     private fun configureFullscreenWindow() {
-        window.addFlags(8192 or 1024)
+        window.addFlags(
+            WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
+                WindowManager.LayoutParams.FLAG_FULLSCREEN
+        )
         window.decorView.systemUiVisibility =
             View.SYSTEM_UI_FLAG_FULLSCREEN or
                 View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
