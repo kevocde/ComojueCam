@@ -39,6 +39,8 @@ class CameraController(
     @Volatile private var recording = false
     @Volatile private var incidentCaptureActive = false
     private var cameraId = ""
+    private var encoderSurface: Surface? = null
+    private var previewEnabled = true
     private var frameRateRanges = emptyList<Range<Int>>()
     var onCapabilitiesChanged: (() -> Unit)? = null
     var onRecordingReady: ((LoopRecording) -> Unit)? = null
@@ -68,6 +70,27 @@ class CameraController(
             if (camera == null || recording || !holder.surface.isValid) return@post
             session?.close()
             createSession(null)
+        }
+    }
+
+    fun setPreviewEnabled(enabled: Boolean) {
+        handler.post {
+            if (!recording || previewEnabled == enabled) return@post
+            previewEnabled = enabled
+            session?.let { updateRepeatingRequest(it) }
+        }
+    }
+
+    fun pause() {
+        handler.post {
+            if (recording) stopRecording(false, false)
+            closeCamera()
+        }
+    }
+
+    fun resume() {
+        handler.post {
+            if (camera == null && holder.surface.isValid) open()
         }
     }
 
@@ -133,6 +156,7 @@ class CameraController(
             settings.loopDurationSeconds
         )
         recorder!!.start()
+        previewEnabled = true
         session?.close()
         createSession(recorder!!.inputSurface)
         recording = true
@@ -150,6 +174,8 @@ class CameraController(
         state(false)
         session?.close()
         session = null
+        encoderSurface = null
+        previewEnabled = true
         val stopResult = recorder?.stop() ?: RecordingStopResult(null, emptyList())
         recorder = null
         if (resumePreview && holder.surface.isValid) createSession(null)
@@ -167,22 +193,31 @@ class CameraController(
         try {
             val surfaces = listOfNotNull(holder.surface, encoder)
             if (!holder.surface.isValid) return
+            encoderSurface = encoder
             device.createCaptureSession(surfaces, object : CameraCaptureSession.StateCallback() {
                 override fun onConfigured(value: CameraCaptureSession) {
                     session = value
-                    val request = device.createCaptureRequest(CameraDevice.TEMPLATE_RECORD).apply {
-                        addTarget(holder.surface)
-                        encoder?.let { addTarget(it) }
-                        set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO)
-                        selectedFrameRateRange()?.let {
-                            set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, it)
-                        }
-                    }.build()
-                    value.setRepeatingRequest(request, null, handler)
+                    updateRepeatingRequest(value)
                 }
 
                 override fun onConfigureFailed(value: CameraCaptureSession) = Unit
             }, handler)
+        } catch (_: CameraAccessException) {
+        }
+    }
+
+    private fun updateRepeatingRequest(value: CameraCaptureSession) {
+        val device = camera ?: return
+        try {
+            val request = device.createCaptureRequest(CameraDevice.TEMPLATE_RECORD).apply {
+                if (previewEnabled) addTarget(holder.surface)
+                encoderSurface?.let { addTarget(it) }
+                set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO)
+                selectedFrameRateRange()?.let {
+                    set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, it)
+                }
+            }.build()
+            value.setRepeatingRequest(request, null, handler)
         } catch (_: CameraAccessException) {
         }
     }
@@ -219,5 +254,6 @@ class CameraController(
         camera?.close()
         session = null
         camera = null
+        encoderSurface = null
     }
 }
