@@ -178,8 +178,12 @@ class CameraController(
     }
 
     private fun handleCollision() {
-        if (!recording || incidentCaptureActive) return
+        if (!recording) return
         val activeRecorder = recorder ?: return
+        if (incidentCaptureActive) {
+            activeRecorder.extendIncidentCapture(settings.extraCollisionTimeSeconds)
+            return
+        }
         val preDuration = settings.loopDurationSeconds
         val postDuration = preDuration * settings.incidentMultiplier
         val started = activeRecorder.startIncidentCapture(preDuration, postDuration) { incident ->

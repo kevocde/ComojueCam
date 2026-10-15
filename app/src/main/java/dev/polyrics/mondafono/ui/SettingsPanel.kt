@@ -21,6 +21,7 @@ class SettingsPanel(
     private var pendingSize = settings.size
     private var pendingLoopDuration = settings.loopDurationSeconds
     private var pendingIncidentMultiplier = settings.incidentMultiplier
+    private var pendingExtraCollisionTime = settings.extraCollisionTimeSeconds
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = Typeface.MONOSPACE }
 
     fun syncFromSettings() {
@@ -28,18 +29,21 @@ class SettingsPanel(
         pendingSize = settings.size
         pendingLoopDuration = settings.loopDurationSeconds
         pendingIncidentMultiplier = settings.incidentMultiplier
+        pendingExtraCollisionTime = settings.extraCollisionTimeSeconds
         invalidate()
     }
 
     private fun hasChanges() = pendingFrameRate != settings.frameRate ||
         pendingSize != settings.size || pendingLoopDuration != settings.loopDurationSeconds ||
-        pendingIncidentMultiplier != settings.incidentMultiplier
+        pendingIncidentMultiplier != settings.incidentMultiplier ||
+        pendingExtraCollisionTime != settings.extraCollisionTimeSeconds
 
     private fun applyChanges() {
         settings.frameRate = pendingFrameRate
         settings.size = pendingSize
         settings.loopDurationSeconds = pendingLoopDuration
         settings.incidentMultiplier = pendingIncidentMultiplier
+        settings.extraCollisionTimeSeconds = pendingExtraCollisionTime
         onApply?.invoke()
         invalidate()
     }
@@ -97,6 +101,7 @@ class SettingsPanel(
         } else {
             drawLoopControl(canvas, top + 70f, left)
             drawIncidentControl(canvas, top + 126f, left)
+            drawExtraCollisionControl(canvas, top + 182f, left)
         }
     }
 
@@ -130,11 +135,19 @@ class SettingsPanel(
         drawButton(canvas, "CHANGE", controlLeft + 104f, top, controlLeft + 200f, top + 40f, Color.rgb(255, 176, 0))
     }
 
+    private fun drawExtraCollisionControl(canvas: Canvas, top: Float, left: Float) {
+        drawLabel(canvas, "EXTRA COLLITION TIME:", top, left)
+        val controlLeft = left + 160f
+        drawButton(canvas, "-", controlLeft, top, controlLeft + 42f, top + 40f, Color.rgb(255, 176, 0))
+        drawValue(canvas, "${pendingExtraCollisionTime}s", controlLeft + 50f, top, controlLeft + 146f)
+        drawButton(canvas, "+", controlLeft + 154f, top, controlLeft + 196f, top + 40f, Color.rgb(255, 176, 0))
+    }
+
     private fun drawLabel(canvas: Canvas, label: String, top: Float, left: Float) {
         paint.style = Paint.Style.FILL
         paint.color = Color.rgb(255, 176, 0)
         paint.textAlign = Paint.Align.LEFT
-        paint.textSize = 16f
+        paint.textSize = if (label.length > 12) 11f else 16f
         canvas.drawText(label, left + 28f, top + 28f, paint)
     }
 
@@ -177,6 +190,7 @@ class SettingsPanel(
             activeTab == 0 && event.y in panelTop + 142f..panelTop + 182f -> changeFrameRate(event.x)
             activeTab == 1 && event.y in panelTop + 142f..panelTop + 182f -> changeLoop(event.x)
             activeTab == 1 && event.y in panelTop + 198f..panelTop + 238f -> changeIncidentMultiplier()
+            activeTab == 1 && event.y in panelTop + 254f..panelTop + 294f -> changeExtraCollisionTime(event.x)
         }
         return true
     }
@@ -225,6 +239,16 @@ class SettingsPanel(
 
     private fun changeIncidentMultiplier() {
         pendingIncidentMultiplier = if (pendingIncidentMultiplier == 6) 2 else pendingIncidentMultiplier + 1
+        invalidate()
+    }
+
+    private fun changeExtraCollisionTime(x: Float) {
+        val left = width * 0.12f + 160f
+        pendingExtraCollisionTime = when {
+            x in left..left + 42f -> (pendingExtraCollisionTime - 20).coerceAtLeast(20)
+            x in left + 154f..left + 196f -> (pendingExtraCollisionTime + 20).coerceAtMost(60)
+            else -> pendingExtraCollisionTime
+        }
         invalidate()
     }
 }

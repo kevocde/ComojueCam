@@ -11,4 +11,5 @@ class RecordingSettings {
     var size = VideoSize(1280, 720)
     var loopDurationSeconds = 30
     var incidentMultiplier = 2
+    var extraCollisionTimeSeconds = 20
 }

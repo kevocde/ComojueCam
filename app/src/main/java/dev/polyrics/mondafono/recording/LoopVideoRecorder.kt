@@ -136,6 +136,12 @@ class LoopVideoRecorder(
         return true
     }
 
+    fun extendIncidentCapture(extraSeconds: Int) {
+        synchronized(bufferLock) {
+            incidentCaptures.forEach { it.extend(extraSeconds * 1_000_000L) }
+        }
+    }
+
     fun stop(): LoopRecording? {
         var recording: LoopRecording? = null
         try {
@@ -179,13 +185,17 @@ class LoopVideoRecorder(
 
     private class IncidentCapture(
         val samples: MutableList<EncodedSample>,
-        private val endTimeUs: Long,
+        private var endTimeUs: Long,
         val durationSeconds: Int,
         val onComplete: (LoopRecording) -> Unit
     ) {
         fun append(sample: EncodedSample): Boolean {
             samples += sample
             return sample.presentationTimeUs >= endTimeUs
+        }
+
+        fun extend(extraTimeUs: Long) {
+            endTimeUs += extraTimeUs
         }
     }
 }
