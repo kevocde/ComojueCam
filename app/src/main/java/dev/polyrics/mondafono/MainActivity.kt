@@ -13,6 +13,7 @@ import dev.polyrics.mondafono.camera.CameraController
 import dev.polyrics.mondafono.recording.LoopRecording
 import dev.polyrics.mondafono.recording.RecordingSettings
 import dev.polyrics.mondafono.storage.RecordingStorage
+import dev.polyrics.mondafono.sound.CollisionSound
 import dev.polyrics.mondafono.ui.RetroOverlay
 import dev.polyrics.mondafono.ui.SavePanel
 import dev.polyrics.mondafono.ui.SettingsPanel
@@ -23,6 +24,7 @@ class MainActivity : Activity() {
     private lateinit var settingsPanel: SettingsPanel
     private lateinit var savePanel: SavePanel
     private lateinit var recordingStorage: RecordingStorage
+    private lateinit var collisionSound: CollisionSound
     private var pendingRecording: LoopRecording? = null
 
     override fun onCreate(state: Bundle?) {
@@ -35,6 +37,7 @@ class MainActivity : Activity() {
         settingsPanel = SettingsPanel(this, recordingSettings)
         savePanel = SavePanel(this)
         recordingStorage = RecordingStorage(this)
+        collisionSound = CollisionSound()
         settingsPanel.visibility = View.GONE
         savePanel.visibility = View.GONE
 
@@ -69,7 +72,10 @@ class MainActivity : Activity() {
             }.start()
         }
         cameraController.onGForceChanged = cameraOverlay::setGForce
-        cameraController.onIncidentStateChanged = cameraOverlay::setCollisionWarning
+        cameraController.onIncidentStateChanged = { active ->
+            cameraOverlay.setCollisionWarning(active)
+            if (active) collisionSound.play()
+        }
         cameraOverlay.onRecord = { cameraController.toggleRecording() }
         cameraOverlay.onSettings = { settingsPanel.visibility = View.VISIBLE }
         settingsPanel.onApply = { cameraController.applySettings() }
@@ -101,6 +107,7 @@ class MainActivity : Activity() {
 
     override fun onDestroy() {
         if (::cameraController.isInitialized) cameraController.close()
+        if (::collisionSound.isInitialized) collisionSound.release()
         pendingRecording?.release()
         super.onDestroy()
     }
