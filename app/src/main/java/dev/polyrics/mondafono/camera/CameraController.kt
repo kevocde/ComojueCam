@@ -45,6 +45,7 @@ class CameraController(
     var onIncidentReady: ((LoopRecording) -> Unit)? = null
     var onGForceChanged: ((Float) -> Unit)? = null
     var onIncidentStateChanged: ((Boolean) -> Unit)? = null
+    var onCollisionDetected: (() -> Unit)? = null
 
     override fun surfaceCreated(holder: SurfaceHolder) {
         if (context.checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) open()
@@ -192,6 +193,7 @@ class CameraController(
 
     private fun handleCollision() {
         if (!recording) return
+        onCollisionDetected?.invoke()
         val activeRecorder = recorder ?: return
         if (incidentCaptureActive) {
             activeRecorder.extendIncidentCapture(settings.extraCollisionTimeSeconds)

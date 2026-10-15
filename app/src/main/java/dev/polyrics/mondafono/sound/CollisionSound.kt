@@ -27,11 +27,13 @@ class CollisionSound {
     }
 
     fun play() {
-        stop()
-        generator = ToneGenerator(AudioManager.STREAM_NOTIFICATION, VOLUME)
-        toneIndex = 0
-        stopAt = SystemClock.elapsedRealtime() + SOUND_DURATION_MS
-        handler.post(toneLoop)
+        handler.post {
+            stop()
+            generator = ToneGenerator(AudioManager.STREAM_NOTIFICATION, VOLUME)
+            toneIndex = 0
+            stopAt = SystemClock.elapsedRealtime() + SOUND_DURATION_MS
+            handler.post(toneLoop)
+        }
     }
 
     fun release() {
@@ -49,6 +51,6 @@ class CollisionSound {
         const val SOUND_DURATION_MS = 5_000L
         const val TONE_DURATION_MS = 240L
         const val TONE_INTERVAL_MS = 320L
-        const val VOLUME = 90
+        const val VOLUME = 100
     }
 }

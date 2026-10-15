@@ -5,7 +5,6 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
-import android.os.SystemClock
 import kotlin.math.sqrt
 
 class CollisionDetector(
@@ -19,7 +18,6 @@ class CollisionDetector(
     private var active = false
     private var gravityInitialized = false
     private var thresholdReached = false
-    private var lastCollisionAt = 0L
 
     fun start() {
         if (active || accelerometer == null) return
@@ -55,11 +53,9 @@ class CollisionDetector(
         val acceleration = sqrt(linearX * linearX + linearY * linearY + linearZ * linearZ)
         onGForceChanged(acceleration / SensorManager.GRAVITY_EARTH)
         val threshold = 2.5f * SensorManager.GRAVITY_EARTH
-        val now = SystemClock.elapsedRealtime()
 
         if (acceleration >= threshold) {
-            if (!thresholdReached && now - lastCollisionAt >= COLLISION_COOLDOWN_MS) {
-                lastCollisionAt = now
+            if (!thresholdReached) {
                 onCollision()
             }
             thresholdReached = true
@@ -71,7 +67,6 @@ class CollisionDetector(
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
 
     private companion object {
-        const val COLLISION_COOLDOWN_MS = 3_000L
         const val RESET_RATIO = 0.8f
     }
 }

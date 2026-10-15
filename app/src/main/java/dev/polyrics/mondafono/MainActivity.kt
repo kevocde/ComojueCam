@@ -74,8 +74,8 @@ class MainActivity : Activity() {
         cameraController.onGForceChanged = cameraOverlay::setGForce
         cameraController.onIncidentStateChanged = { active ->
             cameraOverlay.setCollisionWarning(active)
-            if (active) collisionSound.play()
         }
+        cameraController.onCollisionDetected = { collisionSound.play() }
         cameraOverlay.onRecord = { cameraController.toggleRecording() }
         cameraOverlay.onSettings = { settingsPanel.visibility = View.VISIBLE }
         settingsPanel.onApply = { cameraController.applySettings() }
