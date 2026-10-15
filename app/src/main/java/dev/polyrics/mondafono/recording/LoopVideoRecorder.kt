@@ -65,6 +65,11 @@ class LoopRecording(
     }
 }
 
+data class RecordingStopResult(
+    val manualRecording: LoopRecording?,
+    val incidentRecordings: List<LoopRecording>
+)
+
 class LoopVideoRecorder(
     private val width: Int,
     private val height: Int,
@@ -142,21 +147,27 @@ class LoopVideoRecorder(
         }
     }
 
-    fun stop(): LoopRecording? {
-        var recording: LoopRecording? = null
+    fun stop(): RecordingStopResult {
+        var result: RecordingStopResult? = null
         try {
             codec.signalEndOfInputStream()
             thread?.join()
             outputFormat?.let {
                 val bufferedSamples = synchronized(bufferLock) { samples.toList() }
-                recording = LoopRecording(it, bufferedSamples, durationSeconds)
+                val incidents = synchronized(bufferLock) {
+                    incidentCaptures.map { capture -> capture.toRecording(it) }
+                }
+                result = RecordingStopResult(
+                    LoopRecording(it, bufferedSamples, durationSeconds),
+                    incidents
+                )
             }
         } finally {
             inputSurface.release()
             codec.stop()
             codec.release()
         }
-        return recording
+        return result ?: RecordingStopResult(null, emptyList())
     }
 
     private fun trimSamples(latestPresentationTimeUs: Long) {
@@ -196,6 +207,10 @@ class LoopVideoRecorder(
 
         fun extend(extraTimeUs: Long) {
             endTimeUs += extraTimeUs
+        }
+
+        fun toRecording(format: MediaFormat): LoopRecording {
+            return LoopRecording(format, samples, durationSeconds, "incient_")
         }
     }
 }

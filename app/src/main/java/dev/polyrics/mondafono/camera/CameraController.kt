@@ -16,6 +16,7 @@ import android.view.Surface
 import android.view.SurfaceHolder
 import dev.polyrics.mondafono.recording.LoopRecording
 import dev.polyrics.mondafono.recording.LoopVideoRecorder
+import dev.polyrics.mondafono.recording.RecordingStopResult
 import dev.polyrics.mondafono.recording.RecordingSettings
 import dev.polyrics.mondafono.recording.VideoSize
 import dev.polyrics.mondafono.sensor.CollisionDetector
@@ -138,6 +139,7 @@ class CameraController(
 
     private fun stopRecording(resumePreview: Boolean = true, askToSave: Boolean = true) {
         if (!recording) return
+        val incidentWasActive = incidentCaptureActive
         recording = false
         collisionDetector.stop()
         incidentCaptureActive = false
@@ -145,10 +147,16 @@ class CameraController(
         state(false)
         session?.close()
         session = null
-        val finishedRecording = recorder?.stop()
+        val stopResult = recorder?.stop() ?: RecordingStopResult(null, emptyList())
         recorder = null
         if (resumePreview && holder.surface.isValid) createSession(null)
-        if (askToSave && finishedRecording != null) onRecordingReady?.invoke(finishedRecording)
+        if (!askToSave) return
+        if (incidentWasActive) {
+            stopResult.incidentRecordings.forEach { onIncidentReady?.invoke(it) }
+        } else {
+            stopResult.manualRecording?.let { onRecordingReady?.invoke(it) }
+            stopResult.incidentRecordings.forEach { onIncidentReady?.invoke(it) }
+        }
     }
 
     private fun createSession(encoder: Surface?) {
