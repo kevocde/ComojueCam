@@ -242,7 +242,13 @@ private class RetroOverlay(context: Context) : View(context) {
     }
 
     private fun formatElapsedTime(seconds: Long): String {
-        return String.format(Locale.US, "%02d:%02d", seconds / 60, seconds % 60)
+        return String.format(
+            Locale.US,
+            "%02d:%02d:%02d",
+            seconds / 3_600,
+            seconds / 60 % 60,
+            seconds % 60
+        )
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
