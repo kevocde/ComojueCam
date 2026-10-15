@@ -24,6 +24,7 @@ import android.os.Bundle
 import android.os.Environment
 import android.os.Handler
 import android.os.HandlerThread
+import android.os.SystemClock
 import android.view.MotionEvent
 import android.view.Surface
 import android.view.SurfaceHolder
@@ -71,7 +72,7 @@ class MainActivity : Activity() {
         setContentView(root)
 
         camera = CameraController(this, preview.holder, recordingSettings) { recording ->
-            overlay.recording = recording
+            overlay.setRecording(recording)
             overlay.settingsEnabled = !recording
             settings.isEnabled = !recording
             if (recording) settings.visibility = View.GONE
@@ -169,11 +170,32 @@ class MainActivity : Activity() {
 }
 
 private class RetroOverlay(context: Context) : View(context) {
-    var recording = false
+    private var recording = false
     var settingsEnabled = true
     var onRecord: (() -> Unit)? = null
     var onSettings: (() -> Unit)? = null
+    private var recordingStartedAt = 0L
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = Typeface.MONOSPACE }
+    private val timerRefresh = object : Runnable {
+        override fun run() {
+            if (recording) {
+                invalidate()
+                postDelayed(this, 500L)
+            }
+        }
+    }
+
+    fun setRecording(value: Boolean) {
+        if (recording == value) return
+        recording = value
+        if (value) {
+            recordingStartedAt = SystemClock.elapsedRealtime()
+            post(timerRefresh)
+        } else {
+            removeCallbacks(timerRefresh)
+        }
+        invalidate()
+    }
 
     override fun onDraw(canvas: Canvas) {
         val amber = Color.rgb(255, 176, 0)
@@ -208,10 +230,19 @@ private class RetroOverlay(context: Context) : View(context) {
         canvas.drawText(if (recording) "STOP" else "REC", width / 2f, top + 40f, paint)
 
         if (recording) {
-            paint.textAlign = Paint.Align.LEFT
+            val elapsedMillis = SystemClock.elapsedRealtime() - recordingStartedAt
+            val elapsedSeconds = elapsedMillis / 1000L
             paint.textSize = 16f
-            canvas.drawText("* RECORDING", 32f, 48f, paint)
+            paint.textAlign = Paint.Align.LEFT
+            canvas.drawText(formatElapsedTime(elapsedSeconds), 32f, 48f, paint)
+            if ((elapsedMillis / 500L) % 2L == 0L) {
+                canvas.drawText("* RECORDING", 118f, 48f, paint)
+            }
         }
+    }
+
+    private fun formatElapsedTime(seconds: Long): String {
+        return String.format(Locale.US, "%02d:%02d", seconds / 60, seconds % 60)
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
