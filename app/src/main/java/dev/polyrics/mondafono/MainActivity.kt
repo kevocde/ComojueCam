@@ -282,7 +282,7 @@ private class SettingsPanel(
 ) : View(context) {
     var onClose: (() -> Unit)? = null
     var onApply: (() -> Unit)? = null
-    private val tabs = listOf("video", "record")
+    private val tabs = listOf("VIDEO", "RECORD")
     private var activeTab = 0
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = Typeface.MONOSPACE }
     private var pendingFrameRate = settings.frameRate
