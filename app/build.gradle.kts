@@ -1,9 +1,20 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
 }
 
+fun readLocalTelemetryUrl(): String? {
+    val file = rootProject.file("local.properties")
+    if (!file.exists()) return null
+    val props = Properties()
+    file.inputStream().use { props.load(it) }
+    return props.getProperty("telemetryUrl")
+}
+
 val telemetryUrl = providers.environmentVariable("TELEMETRY_URL").orNull
     ?: providers.gradleProperty("telemetryUrl").orNull
+    ?: readLocalTelemetryUrl()
     ?: "ws://10.0.2.2:8080"
 
 android {
