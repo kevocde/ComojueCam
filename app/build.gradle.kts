@@ -2,7 +2,9 @@ plugins {
     alias(libs.plugins.android.application)
 }
 
-val telemetryUrl = System.getenv("TELEMETRY_URL") ?: "ws://10.0.2.2:8080"
+val telemetryUrl = providers.environmentVariable("TELEMETRY_URL").orNull
+    ?: providers.gradleProperty("telemetryUrl").orNull
+    ?: "ws://10.0.2.2:8080"
 
 android {
     namespace = "dev.polyrics.comojuecam"
