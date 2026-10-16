@@ -26,6 +26,7 @@ class TelemetryCollector(
     private val accelPeak = SensorPeak()
     private val magPeak = SensorPeak()
     private var lastLocation: Location? = null
+    private var lastPublishedSecond = 0L
     val samples = ConcurrentLinkedQueue<TelemetrySample>()
 
     private val tick = object : Runnable {
@@ -88,13 +89,16 @@ class TelemetryCollector(
     }
 
     private fun publishSample() {
+        val second = System.currentTimeMillis() / 1000L
+        if (second == lastPublishedSecond) return
+        lastPublishedSecond = second
         val gyro = remapToScreenFrame(gyroPeak.readAndReset())
         val accel = remapToScreenFrame(accelPeak.readAndReset())
         val mag = remapToScreenFrame(magPeak.readAndReset())
         val location = lastLocation
         samples.add(
             TelemetrySample(
-                timestampSeconds = System.currentTimeMillis() / 1000L,
+                timestampSeconds = second,
                 gyroX = gyro[0], gyroY = gyro[1], gyroZ = gyro[2],
                 accelX = accel[0], accelY = accel[1], accelZ = accel[2],
                 magX = mag[0], magY = mag[1], magZ = mag[2],

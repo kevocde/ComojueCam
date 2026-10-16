@@ -4,6 +4,7 @@ import android.util.Base64
 import java.io.BufferedReader
 import java.io.IOException
 import java.io.InputStreamReader
+import java.net.InetSocketAddress
 import java.net.Socket
 import java.net.URI
 import java.security.SecureRandom
@@ -19,13 +20,15 @@ class WebSocketConnection {
         val uri = URI(endpoint)
         val secure = uri.scheme.equals("wss", ignoreCase = true)
         val port = if (uri.port > 0) uri.port else if (secure) 443 else 80
+        val raw = Socket()
+        raw.connect(InetSocketAddress(uri.host, port), CONNECT_TIMEOUT_MS)
+        raw.tcpNoDelay = true
+        raw.soTimeout = HANDSHAKE_TIMEOUT_MS
         val created = if (secure) {
-            SSLContext.getDefault().socketFactory.createSocket(uri.host, port)
+            SSLContext.getDefault().socketFactory.createSocket(raw, uri.host, port, true)
         } else {
-            Socket(uri.host, port)
+            raw
         }
-        created.tcpNoDelay = true
-        created.soTimeout = HANDSHAKE_TIMEOUT_MS
         handshake(created, uri)
         socket = created
         output = created.getOutputStream()
@@ -105,6 +108,7 @@ class WebSocketConnection {
     }
 
     private companion object {
+        const val CONNECT_TIMEOUT_MS = 8000
         const val HANDSHAKE_TIMEOUT_MS = 8000
     }
 }
