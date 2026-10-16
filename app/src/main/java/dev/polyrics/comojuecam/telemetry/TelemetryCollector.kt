@@ -47,6 +47,11 @@ class TelemetryCollector(
         locationManager.removeUpdates(this)
     }
 
+    fun publishNow() {
+        handler.removeCallbacks(tick)
+        publishSample()
+    }
+
     override fun onSensorChanged(event: SensorEvent) {
         when (event.sensor.type) {
             Sensor.TYPE_GYROSCOPE -> gyroAverage.add(event.values)
@@ -66,7 +71,7 @@ class TelemetryCollector(
                 .filter { locationManager.allProviders.contains(it) }
             providers.forEach {
                 locationManager.requestLocationUpdates(
-                    it, settings.sampleSeconds * 1000L, 0f, this, handler.looper
+                    it, settings.sampleSeconds * 1000L, 0f, this
                 )
             }
         } catch (_: SecurityException) {
