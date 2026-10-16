@@ -107,7 +107,7 @@ class MainActivity : Activity() {
         cameraOverlay.onRecord = { cameraController.toggleRecording() }
         cameraOverlay.onInteraction = { resetInactivityTimer() }
         cameraOverlay.onSettings = { settingsPanel.visibility = View.VISIBLE }
-        idleOverlay.onWake = { exitLowPowerMode() }
+        idleOverlay.onWake = { resetInactivityTimer() }
         idleOverlay.onStop = { cameraController.toggleRecording() }
         settingsPanel.onApply = {
             cameraController.applySettings()
@@ -247,10 +247,7 @@ class MainActivity : Activity() {
 
     private fun resetInactivityTimer() {
         if (!recordingActive) return
-        if (lowPowerMode) {
-            exitLowPowerMode()
-            return
-        }
+        if (lowPowerMode) exitLowPowerMode()
         inactivityHandler.removeCallbacks(inactivityTimeout)
         inactivityHandler.postDelayed(inactivityTimeout, LOW_POWER_DELAY_MS)
     }
