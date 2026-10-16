@@ -16,6 +16,7 @@ The application is landscape-only, fullscreen, and uses a minimal retro-style ov
 - `app/src/main/java/dev/polyrics/comojuecam/camera/CameraController.kt`: Camera2 lifecycle and capture sessions.
 - `app/src/main/java/dev/polyrics/comojuecam/recording/`: recording settings, MediaCodec buffer, and MP4 clips.
 - `app/src/main/java/dev/polyrics/comojuecam/sensor/CollisionDetector.kt`: accelerometer-based collision detection.
+- `app/src/main/java/dev/polyrics/comojuecam/telemetry/`: optional WebSocket telemetry (TEL tab): sensor collector in screen-frame axes, file-based outbox with backoff retries, zero-dependency RFC 6455 client. See `docs/decisions.md` for rationale.
 - `app/src/main/java/dev/polyrics/comojuecam/sound/CollisionSound.kt`: generated collision alert tones.
 - `app/src/main/java/dev/polyrics/comojuecam/storage/RecordingStorage.kt`: public video storage through MediaStore.
 - `app/src/main/java/dev/polyrics/comojuecam/ui/`: native retro overlay, panels, and low-power display.
@@ -32,6 +33,9 @@ Use the Gradle wrapper from the project root:
 ./gradlew :app:assembleDebug
 ./gradlew :app:assembleRelease
 ```
+
+The telemetry server URL is a build-time value: env `TELEMETRY_URL`, or `telemetryUrl=` in
+`local.properties` / a gradle property, default `ws://10.0.2.2:8080`.
 
 The optimized release APK is generated at:
 
