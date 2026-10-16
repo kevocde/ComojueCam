@@ -9,6 +9,8 @@ import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
 import android.os.Handler
+import android.view.Surface
+import android.view.WindowManager
 import java.util.concurrent.ConcurrentLinkedQueue
 import kotlin.math.abs
 
@@ -19,9 +21,12 @@ class TelemetryCollector(
 ) : SensorEventListener, LocationListener {
     private val sensorManager = context.getSystemService(SensorManager::class.java)
     private val locationManager = context.getSystemService(LocationManager::class.java)
+    private val displayRotation = context.getSystemService(WindowManager::class.java).defaultDisplay.rotation
     private val gyroPeak = SensorPeak()
     private val accelPeak = SensorPeak()
+    private val magPeak = SensorPeak()
     private var lastLocation: Location? = null
+    private var lastPublishedSecond = 0L
     val samples = ConcurrentLinkedQueue<TelemetrySample>()
 
     private val tick = object : Runnable {
@@ -36,6 +41,9 @@ class TelemetryCollector(
             sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL, handler)
         }
         sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)?.let {
+            sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL, handler)
+        }
+        sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)?.let {
             sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL, handler)
         }
         requestLocationUpdates()
@@ -57,6 +65,7 @@ class TelemetryCollector(
         when (event.sensor.type) {
             Sensor.TYPE_GYROSCOPE -> gyroPeak.add(event.values)
             Sensor.TYPE_ACCELEROMETER -> accelPeak.add(event.values)
+            Sensor.TYPE_MAGNETIC_FIELD -> magPeak.add(event.values)
         }
     }
 
@@ -80,19 +89,33 @@ class TelemetryCollector(
     }
 
     private fun publishSample() {
-        val gyro = gyroPeak.readAndReset()
-        val accel = accelPeak.readAndReset()
+        val second = System.currentTimeMillis() / 1000L
+        if (second == lastPublishedSecond) return
+        lastPublishedSecond = second
+        val gyro = remapToScreenFrame(gyroPeak.readAndReset())
+        val accel = remapToScreenFrame(accelPeak.readAndReset())
+        val mag = remapToScreenFrame(magPeak.readAndReset())
         val location = lastLocation
         samples.add(
             TelemetrySample(
-                timestampSeconds = System.currentTimeMillis() / 1000L,
+                timestampSeconds = second,
                 gyroX = gyro[0], gyroY = gyro[1], gyroZ = gyro[2],
                 accelX = accel[0], accelY = accel[1], accelZ = accel[2],
+                magX = mag[0], magY = mag[1], magZ = mag[2],
                 speedKmh = location?.takeIf { it.hasSpeed() }?.let { it.speed * 3.6 },
                 latitude = location?.latitude,
                 longitude = location?.longitude
             )
         )
+    }
+
+    // Sensor values arrive in the portrait device frame; rotate them into the
+    // screen frame so axes match the landscape UI and vehicle mounting.
+    private fun remapToScreenFrame(value: DoubleArray): DoubleArray = when (displayRotation) {
+        Surface.ROTATION_90 -> doubleArrayOf(-value[1], value[0], value[2])
+        Surface.ROTATION_180 -> doubleArrayOf(-value[0], -value[1], value[2])
+        Surface.ROTATION_270 -> doubleArrayOf(value[1], -value[0], value[2])
+        else -> value
     }
 
     private class SensorPeak {
