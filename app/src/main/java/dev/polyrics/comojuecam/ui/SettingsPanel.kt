@@ -9,14 +9,16 @@ import android.view.MotionEvent
 import android.view.View
 import dev.polyrics.comojuecam.recording.CollisionSensitivity
 import dev.polyrics.comojuecam.recording.RecordingSettings
+import dev.polyrics.comojuecam.telemetry.TelemetrySettings
 
 class SettingsPanel(
     context: Context,
-    private val settings: RecordingSettings
+    private val settings: RecordingSettings,
+    private val telemetry: TelemetrySettings
 ) : View(context) {
     var onClose: (() -> Unit)? = null
     var onApply: (() -> Unit)? = null
-    private val tabs = listOf("VIDEO", "RECORD", "C. DETECTION")
+    private val tabs = listOf("VIDEO", "RECORD", "C. DETECTION", "TEL")
     private var activeTab = 0
     private var pendingFrameRate = settings.frameRate
     private var pendingSize = settings.size
@@ -24,6 +26,9 @@ class SettingsPanel(
     private var pendingIncidentPostDuration = settings.incidentPostDurationSeconds
     private var pendingExtraCollisionTime = settings.extraCollisionTimeSeconds
     private var pendingCollisionSensitivity = settings.collisionSensitivity
+    private var pendingTelemetryEnabled = telemetry.enabled
+    private var pendingSendInterval = telemetry.sendIntervalMinutes
+    private var pendingSampleSeconds = telemetry.sampleSeconds
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = Typeface.MONOSPACE }
 
     fun syncFromSettings() {
@@ -33,6 +38,9 @@ class SettingsPanel(
         pendingIncidentPostDuration = settings.incidentPostDurationSeconds
         pendingExtraCollisionTime = settings.extraCollisionTimeSeconds
         pendingCollisionSensitivity = settings.collisionSensitivity
+        pendingTelemetryEnabled = telemetry.enabled
+        pendingSendInterval = telemetry.sendIntervalMinutes
+        pendingSampleSeconds = telemetry.sampleSeconds
         invalidate()
     }
 
@@ -40,7 +48,10 @@ class SettingsPanel(
         pendingSize != settings.size || pendingLoopDuration != settings.loopDurationSeconds ||
         pendingIncidentPostDuration != settings.incidentPostDurationSeconds ||
         pendingExtraCollisionTime != settings.extraCollisionTimeSeconds ||
-        pendingCollisionSensitivity != settings.collisionSensitivity
+        pendingCollisionSensitivity != settings.collisionSensitivity ||
+        pendingTelemetryEnabled != telemetry.enabled ||
+        pendingSendInterval != telemetry.sendIntervalMinutes ||
+        pendingSampleSeconds != telemetry.sampleSeconds
 
     private fun applyChanges() {
         settings.frameRate = pendingFrameRate
@@ -49,6 +60,10 @@ class SettingsPanel(
         settings.incidentPostDurationSeconds = pendingIncidentPostDuration
         settings.extraCollisionTimeSeconds = pendingExtraCollisionTime
         settings.collisionSensitivity = pendingCollisionSensitivity
+        telemetry.enabled = pendingTelemetryEnabled
+        telemetry.sendIntervalMinutes = pendingSendInterval
+        telemetry.sampleSeconds = pendingSampleSeconds
+        telemetry.save()
         onApply?.invoke()
         invalidate()
     }
@@ -113,6 +128,41 @@ class SettingsPanel(
             drawExtraCollisionControl(canvas, top + 126f, left)
             drawSensitivityControl(canvas, top + 182f, left)
         }
+        if (activeTab == 3) {
+            drawTelemetryToggle(canvas, top + 70f, left)
+            drawTokenControl(canvas, top + 126f, left)
+            drawEachControl(canvas, top + 182f, left)
+            drawSampleControl(canvas, top + 238f, left)
+        }
+    }
+
+    private fun drawTelemetryToggle(canvas: Canvas, top: Float, left: Float) {
+        drawLabel(canvas, "TELEMETRY:", top, left)
+        val controlLeft = left + 160f
+        val label = if (pendingTelemetryEnabled) "ON" else "OFF"
+        drawButton(canvas, label, controlLeft, top, controlLeft + 96f, top + 40f, Color.rgb(255, 176, 0))
+    }
+
+    private fun drawTokenControl(canvas: Canvas, top: Float, left: Float) {
+        drawLabel(canvas, "CODE:", top, left)
+        val controlLeft = left + 160f
+        drawValue(canvas, telemetry.token, controlLeft, top, controlLeft + 96f)
+    }
+
+    private fun drawEachControl(canvas: Canvas, top: Float, left: Float) {
+        drawLabel(canvas, "EACH:", top, left)
+        val controlLeft = left + 160f
+        drawButton(canvas, "-", controlLeft, top, controlLeft + 42f, top + 40f, Color.rgb(255, 176, 0))
+        drawValue(canvas, "${pendingSendInterval}m", controlLeft + 50f, top, controlLeft + 146f)
+        drawButton(canvas, "+", controlLeft + 154f, top, controlLeft + 196f, top + 40f, Color.rgb(255, 176, 0))
+    }
+
+    private fun drawSampleControl(canvas: Canvas, top: Float, left: Float) {
+        drawLabel(canvas, "SAMPLE:", top, left)
+        val controlLeft = left + 160f
+        drawButton(canvas, "-", controlLeft, top, controlLeft + 42f, top + 40f, Color.rgb(255, 176, 0))
+        drawValue(canvas, "${pendingSampleSeconds}s", controlLeft + 50f, top, controlLeft + 146f)
+        drawButton(canvas, "+", controlLeft + 154f, top, controlLeft + 196f, top + 40f, Color.rgb(255, 176, 0))
     }
 
     private fun drawFrameRateControl(canvas: Canvas, top: Float, left: Float) {
@@ -210,6 +260,9 @@ class SettingsPanel(
             activeTab == 2 && event.y in panelTop + 142f..panelTop + 182f -> changePostTime(event.x)
             activeTab == 2 && event.y in panelTop + 198f..panelTop + 238f -> changeExtraCollisionTime(event.x)
             activeTab == 2 && event.y in panelTop + 254f..panelTop + 294f -> changeSensitivity()
+            activeTab == 3 && event.y in panelTop + 142f..panelTop + 182f -> toggleTelemetry()
+            activeTab == 3 && event.y in panelTop + 254f..panelTop + 294f -> changeEach(event.x)
+            activeTab == 3 && event.y in panelTop + 310f..panelTop + 350f -> changeSample(event.x)
         }
         return true
     }
@@ -289,6 +342,31 @@ class SettingsPanel(
     private fun changeSensitivity() {
         val options = CollisionSensitivity.entries
         pendingCollisionSensitivity = options[(pendingCollisionSensitivity.ordinal + 1) % options.size]
+        invalidate()
+    }
+
+    private fun toggleTelemetry() {
+        pendingTelemetryEnabled = !pendingTelemetryEnabled
+        invalidate()
+    }
+
+    private fun changeEach(x: Float) {
+        val left = width * 0.12f + 160f
+        pendingSendInterval = when {
+            x in left..left + 42f -> (pendingSendInterval - 1).coerceAtLeast(1)
+            x in left + 154f..left + 196f -> (pendingSendInterval + 1).coerceAtMost(5)
+            else -> pendingSendInterval
+        }
+        invalidate()
+    }
+
+    private fun changeSample(x: Float) {
+        val left = width * 0.12f + 160f
+        pendingSampleSeconds = when {
+            x in left..left + 42f -> (pendingSampleSeconds - 2).coerceAtLeast(2)
+            x in left + 154f..left + 196f -> (pendingSampleSeconds + 2).coerceAtMost(30)
+            else -> pendingSampleSeconds
+        }
         invalidate()
     }
 }

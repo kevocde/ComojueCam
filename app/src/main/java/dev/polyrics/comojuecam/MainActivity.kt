@@ -16,6 +16,7 @@ import dev.polyrics.comojuecam.recording.LoopRecording
 import dev.polyrics.comojuecam.recording.RecordingSettings
 import dev.polyrics.comojuecam.storage.RecordingStorage
 import dev.polyrics.comojuecam.sound.CollisionSound
+import dev.polyrics.comojuecam.telemetry.TelemetrySettings
 import dev.polyrics.comojuecam.ui.RetroOverlay
 import dev.polyrics.comojuecam.ui.SavePanel
 import dev.polyrics.comojuecam.ui.SettingsPanel
@@ -41,9 +42,10 @@ class MainActivity : Activity() {
         configureFullscreenWindow()
 
         val recordingSettings = RecordingSettings()
+        val telemetrySettings = TelemetrySettings(this)
         val preview = SurfaceView(this)
         cameraOverlay = RetroOverlay(this)
-        settingsPanel = SettingsPanel(this, recordingSettings)
+        settingsPanel = SettingsPanel(this, recordingSettings, telemetrySettings)
         savePanel = SavePanel(this)
         idleOverlay = IdleRecordingOverlay(this)
         recordingStorage = RecordingStorage(this)
