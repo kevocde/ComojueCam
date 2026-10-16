@@ -21,6 +21,7 @@ class TelemetryCollector(
     private val locationManager = context.getSystemService(LocationManager::class.java)
     private val gyroPeak = SensorPeak()
     private val accelPeak = SensorPeak()
+    private val magPeak = SensorPeak()
     private var lastLocation: Location? = null
     val samples = ConcurrentLinkedQueue<TelemetrySample>()
 
@@ -36,6 +37,9 @@ class TelemetryCollector(
             sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL, handler)
         }
         sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)?.let {
+            sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL, handler)
+        }
+        sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)?.let {
             sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL, handler)
         }
         requestLocationUpdates()
@@ -57,6 +61,7 @@ class TelemetryCollector(
         when (event.sensor.type) {
             Sensor.TYPE_GYROSCOPE -> gyroPeak.add(event.values)
             Sensor.TYPE_ACCELEROMETER -> accelPeak.add(event.values)
+            Sensor.TYPE_MAGNETIC_FIELD -> magPeak.add(event.values)
         }
     }
 
@@ -82,12 +87,14 @@ class TelemetryCollector(
     private fun publishSample() {
         val gyro = gyroPeak.readAndReset()
         val accel = accelPeak.readAndReset()
+        val mag = magPeak.readAndReset()
         val location = lastLocation
         samples.add(
             TelemetrySample(
                 timestampSeconds = System.currentTimeMillis() / 1000L,
                 gyroX = gyro[0], gyroY = gyro[1], gyroZ = gyro[2],
                 accelX = accel[0], accelY = accel[1], accelZ = accel[2],
+                magX = mag[0], magY = mag[1], magZ = mag[2],
                 speedKmh = location?.takeIf { it.hasSpeed() }?.let { it.speed * 3.6 },
                 latitude = location?.latitude,
                 longitude = location?.longitude

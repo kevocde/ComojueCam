@@ -12,6 +12,7 @@ object TelemetryJson {
     private fun group(sample: TelemetrySample) = JSONObject().apply {
         put("gyroscope", vector(sample.gyroX, sample.gyroY, sample.gyroZ))
         put("accelerometer", vector(sample.accelX, sample.accelY, sample.accelZ))
+        put("magnetometer", vector(sample.magX, sample.magY, sample.magZ))
         sample.speedKmh?.let { put("velocity", JSONObject().put("speed", round(it, 1))) }
         put("gps", JSONObject().apply {
             sample.latitude?.let { put("latitude", round(it, 5)) }

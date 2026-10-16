@@ -8,6 +8,9 @@ data class TelemetrySample(
     val accelX: Double,
     val accelY: Double,
     val accelZ: Double,
+    val magX: Double,
+    val magY: Double,
+    val magZ: Double,
     val speedKmh: Double?,
     val latitude: Double?,
     val longitude: Double?
