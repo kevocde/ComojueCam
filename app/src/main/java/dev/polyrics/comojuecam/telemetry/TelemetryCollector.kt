@@ -9,6 +9,8 @@ import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
 import android.os.Handler
+import android.view.Surface
+import android.view.WindowManager
 import java.util.concurrent.ConcurrentLinkedQueue
 import kotlin.math.abs
 
@@ -19,6 +21,7 @@ class TelemetryCollector(
 ) : SensorEventListener, LocationListener {
     private val sensorManager = context.getSystemService(SensorManager::class.java)
     private val locationManager = context.getSystemService(LocationManager::class.java)
+    private val displayRotation = context.getSystemService(WindowManager::class.java).defaultDisplay.rotation
     private val gyroPeak = SensorPeak()
     private val accelPeak = SensorPeak()
     private val magPeak = SensorPeak()
@@ -85,9 +88,9 @@ class TelemetryCollector(
     }
 
     private fun publishSample() {
-        val gyro = gyroPeak.readAndReset()
-        val accel = accelPeak.readAndReset()
-        val mag = magPeak.readAndReset()
+        val gyro = remapToScreenFrame(gyroPeak.readAndReset())
+        val accel = remapToScreenFrame(accelPeak.readAndReset())
+        val mag = remapToScreenFrame(magPeak.readAndReset())
         val location = lastLocation
         samples.add(
             TelemetrySample(
@@ -100,6 +103,15 @@ class TelemetryCollector(
                 longitude = location?.longitude
             )
         )
+    }
+
+    // Sensor values arrive in the portrait device frame; rotate them into the
+    // screen frame so axes match the landscape UI and vehicle mounting.
+    private fun remapToScreenFrame(value: DoubleArray): DoubleArray = when (displayRotation) {
+        Surface.ROTATION_90 -> doubleArrayOf(-value[1], value[0], value[2])
+        Surface.ROTATION_180 -> doubleArrayOf(-value[0], -value[1], value[2])
+        Surface.ROTATION_270 -> doubleArrayOf(value[1], -value[0], value[2])
+        else -> value
     }
 
     private class SensorPeak {
