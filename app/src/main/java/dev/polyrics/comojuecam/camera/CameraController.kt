@@ -1,4 +1,4 @@
-package dev.polyrics.mondafono.camera
+package dev.polyrics.comojuecam.camera
 
 import android.Manifest
 import android.content.Context
@@ -14,12 +14,12 @@ import android.os.HandlerThread
 import android.util.Range
 import android.view.Surface
 import android.view.SurfaceHolder
-import dev.polyrics.mondafono.recording.LoopRecording
-import dev.polyrics.mondafono.recording.LoopVideoRecorder
-import dev.polyrics.mondafono.recording.RecordingStopResult
-import dev.polyrics.mondafono.recording.RecordingSettings
-import dev.polyrics.mondafono.recording.VideoSize
-import dev.polyrics.mondafono.sensor.CollisionDetector
+import dev.polyrics.comojuecam.recording.LoopRecording
+import dev.polyrics.comojuecam.recording.LoopVideoRecorder
+import dev.polyrics.comojuecam.recording.RecordingStopResult
+import dev.polyrics.comojuecam.recording.RecordingSettings
+import dev.polyrics.comojuecam.recording.VideoSize
+import dev.polyrics.comojuecam.sensor.CollisionDetector
 
 class CameraController(
     private val context: Context,

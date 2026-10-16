@@ -1,4 +1,4 @@
-package dev.polyrics.mondafono.recording
+package dev.polyrics.comojuecam.recording
 
 import android.media.MediaCodec
 import android.media.MediaCodecInfo

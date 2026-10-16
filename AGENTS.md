@@ -1,8 +1,8 @@
-# Mondafono Agent Guide
+# ComojueCam Agent Guide
 
 ## Project Scope
 
-Mondafono is a minimal Android camera recorder written in Kotlin. It is intentionally limited and always have to use Android framework APIs over other Libs:
+ComojueCam is a minimal Android camera recorder written in Kotlin. It is intentionally limited and always have to use Android framework APIs over other Libs:
 
 - `Camera2` for camera access and preview.
 - `MediaCodec` and `MediaMuxer` for H.264/MP4 video recording.
@@ -12,13 +12,13 @@ The application is landscape-only, fullscreen, and uses a minimal retro-style ov
 
 ## Repository Layout
 
-- `app/src/main/java/dev/polyrics/mondafono/MainActivity.kt`: activity composition, permissions, and feature coordination.
-- `app/src/main/java/dev/polyrics/mondafono/camera/CameraController.kt`: Camera2 lifecycle and capture sessions.
-- `app/src/main/java/dev/polyrics/mondafono/recording/`: recording settings, MediaCodec buffer, and MP4 clips.
-- `app/src/main/java/dev/polyrics/mondafono/sensor/CollisionDetector.kt`: accelerometer-based collision detection.
-- `app/src/main/java/dev/polyrics/mondafono/sound/CollisionSound.kt`: generated collision alert tones.
-- `app/src/main/java/dev/polyrics/mondafono/storage/RecordingStorage.kt`: public video storage through MediaStore.
-- `app/src/main/java/dev/polyrics/mondafono/ui/`: native retro overlay, panels, and low-power display.
+- `app/src/main/java/dev/polyrics/comojuecam/MainActivity.kt`: activity composition, permissions, and feature coordination.
+- `app/src/main/java/dev/polyrics/comojuecam/camera/CameraController.kt`: Camera2 lifecycle and capture sessions.
+- `app/src/main/java/dev/polyrics/comojuecam/recording/`: recording settings, MediaCodec buffer, and MP4 clips.
+- `app/src/main/java/dev/polyrics/comojuecam/sensor/CollisionDetector.kt`: accelerometer-based collision detection.
+- `app/src/main/java/dev/polyrics/comojuecam/sound/CollisionSound.kt`: generated collision alert tones.
+- `app/src/main/java/dev/polyrics/comojuecam/storage/RecordingStorage.kt`: public video storage through MediaStore.
+- `app/src/main/java/dev/polyrics/comojuecam/ui/`: native retro overlay, panels, and low-power display.
 - `app/src/main/AndroidManifest.xml`: camera permission, landscape activity, and launcher declaration.
 - `app/src/main/res/drawable/ic_launcher.xml`: minimal launcher icon.
 - `app/build.gradle.kts`: Android build configuration and release shrinking.

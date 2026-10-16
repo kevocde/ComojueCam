@@ -3,13 +3,13 @@ plugins {
 }
 
 android {
-    namespace = "dev.polyrics.mondafono"
+    namespace = "dev.polyrics.comojuecam"
     compileSdk {
         version = release(37)
     }
 
     defaultConfig {
-        applicationId = "dev.polyrics.mondafono"
+        applicationId = "dev.polyrics.comojuecam"
         minSdk = 24
         targetSdk = 37
         versionCode = 1

@@ -1,4 +1,4 @@
-package dev.polyrics.mondafono.ui
+package dev.polyrics.comojuecam.ui
 
 import android.content.Context
 import android.graphics.Canvas
@@ -7,8 +7,8 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import android.view.MotionEvent
 import android.view.View
-import dev.polyrics.mondafono.recording.CollisionSensitivity
-import dev.polyrics.mondafono.recording.RecordingSettings
+import dev.polyrics.comojuecam.recording.CollisionSensitivity
+import dev.polyrics.comojuecam.recording.RecordingSettings
 
 class SettingsPanel(
     context: Context,

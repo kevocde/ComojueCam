@@ -1,4 +1,4 @@
-package dev.polyrics.mondafono
+package dev.polyrics.comojuecam
 
 import android.Manifest
 import android.app.Activity
@@ -11,15 +11,15 @@ import android.view.SurfaceView
 import android.view.View
 import android.view.WindowManager
 import android.widget.FrameLayout
-import dev.polyrics.mondafono.camera.CameraController
-import dev.polyrics.mondafono.recording.LoopRecording
-import dev.polyrics.mondafono.recording.RecordingSettings
-import dev.polyrics.mondafono.storage.RecordingStorage
-import dev.polyrics.mondafono.sound.CollisionSound
-import dev.polyrics.mondafono.ui.RetroOverlay
-import dev.polyrics.mondafono.ui.SavePanel
-import dev.polyrics.mondafono.ui.SettingsPanel
-import dev.polyrics.mondafono.ui.IdleRecordingOverlay
+import dev.polyrics.comojuecam.camera.CameraController
+import dev.polyrics.comojuecam.recording.LoopRecording
+import dev.polyrics.comojuecam.recording.RecordingSettings
+import dev.polyrics.comojuecam.storage.RecordingStorage
+import dev.polyrics.comojuecam.sound.CollisionSound
+import dev.polyrics.comojuecam.ui.RetroOverlay
+import dev.polyrics.comojuecam.ui.SavePanel
+import dev.polyrics.comojuecam.ui.SettingsPanel
+import dev.polyrics.comojuecam.ui.IdleRecordingOverlay
 
 class MainActivity : Activity() {
     private lateinit var cameraController: CameraController

@@ -1,4 +1,4 @@
-package dev.polyrics.mondafono.sensor
+package dev.polyrics.comojuecam.sensor
 
 import android.content.Context
 import android.hardware.Sensor
