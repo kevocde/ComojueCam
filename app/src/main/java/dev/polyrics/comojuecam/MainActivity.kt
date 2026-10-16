@@ -16,6 +16,7 @@ import dev.polyrics.comojuecam.recording.LoopRecording
 import dev.polyrics.comojuecam.recording.RecordingSettings
 import dev.polyrics.comojuecam.storage.RecordingStorage
 import dev.polyrics.comojuecam.sound.CollisionSound
+import dev.polyrics.comojuecam.telemetry.TelemetryManager
 import dev.polyrics.comojuecam.telemetry.TelemetrySettings
 import dev.polyrics.comojuecam.ui.RetroOverlay
 import dev.polyrics.comojuecam.ui.SavePanel
@@ -30,6 +31,8 @@ class MainActivity : Activity() {
     private lateinit var idleOverlay: IdleRecordingOverlay
     private lateinit var recordingStorage: RecordingStorage
     private lateinit var collisionSound: CollisionSound
+    private lateinit var telemetrySettings: TelemetrySettings
+    private lateinit var telemetryManager: TelemetryManager
     private var pendingRecording: LoopRecording? = null
     private var recordingActive = false
     private var lowPowerMode = false
@@ -42,7 +45,8 @@ class MainActivity : Activity() {
         configureFullscreenWindow()
 
         val recordingSettings = RecordingSettings()
-        val telemetrySettings = TelemetrySettings(this)
+        telemetrySettings = TelemetrySettings(this)
+        telemetryManager = TelemetryManager(this, telemetrySettings)
         val preview = SurfaceView(this)
         cameraOverlay = RetroOverlay(this)
         settingsPanel = SettingsPanel(this, recordingSettings, telemetrySettings)
@@ -72,6 +76,7 @@ class MainActivity : Activity() {
                 if (recording) settingsPanel.visibility = View.GONE
                 cameraOverlay.invalidate()
                 if (recording) resetInactivityTimer() else exitLowPowerMode()
+                if (recording) startTelemetryIfEnabled() else telemetryManager.stop()
             }
         }
         cameraController.onCapabilitiesChanged = {
@@ -104,7 +109,10 @@ class MainActivity : Activity() {
         cameraOverlay.onSettings = { settingsPanel.visibility = View.VISIBLE }
         idleOverlay.onWake = { exitLowPowerMode() }
         idleOverlay.onStop = { cameraController.toggleRecording() }
-        settingsPanel.onApply = { cameraController.applySettings() }
+        settingsPanel.onApply = {
+            cameraController.applySettings()
+            requestLocationPermissionIfNeeded()
+        }
         settingsPanel.onClose = { settingsPanel.visibility = View.GONE }
         savePanel.onSave = { savePendingRecording() }
         savePanel.onDiscard = { discardPendingRecording() }
@@ -129,11 +137,18 @@ class MainActivity : Activity() {
         ) {
             savePendingRecording()
         }
+        if (request == LOCATION_PERMISSION_REQUEST &&
+            results.firstOrNull() == PackageManager.PERMISSION_GRANTED &&
+            recordingActive
+        ) {
+            telemetryManager.start()
+        }
     }
 
     override fun onDestroy() {
         inactivityHandler.removeCallbacks(inactivityTimeout)
         exitLowPowerMode()
+        if (::telemetryManager.isInitialized) telemetryManager.shutdown()
         if (::cameraController.isInitialized) cameraController.close()
         if (::collisionSound.isInitialized) collisionSound.release()
         pendingRecording?.release()
@@ -169,6 +184,31 @@ class MainActivity : Activity() {
             requestPermissions(arrayOf(Manifest.permission.CAMERA), CAMERA_PERMISSION_REQUEST)
         }
     }
+
+    private fun startTelemetryIfEnabled() {
+        if (!telemetrySettings.enabled) return
+        if (!hasLocationPermission()) {
+            requestPermissions(
+                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
+                LOCATION_PERMISSION_REQUEST
+            )
+            return
+        }
+        telemetryManager.start()
+    }
+
+    private fun requestLocationPermissionIfNeeded() {
+        if (telemetrySettings.enabled && !hasLocationPermission()) {
+            requestPermissions(
+                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
+                LOCATION_PERMISSION_REQUEST
+            )
+        }
+    }
+
+    private fun hasLocationPermission() =
+        checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
 
     private fun showSavePanel(recording: LoopRecording) {
         pendingRecording?.release()
@@ -242,6 +282,7 @@ class MainActivity : Activity() {
     private companion object {
         const val CAMERA_PERMISSION_REQUEST = 10
         const val STORAGE_PERMISSION_REQUEST = 20
+        const val LOCATION_PERMISSION_REQUEST = 30
         const val LOW_POWER_DELAY_MS = 90_000L
         const val LOW_POWER_BRIGHTNESS = 0.1f
     }
