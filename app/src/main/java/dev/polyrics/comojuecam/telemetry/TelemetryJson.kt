@@ -12,17 +12,20 @@ object TelemetryJson {
     private fun group(sample: TelemetrySample) = JSONObject().apply {
         put("gyroscope", vector(sample.gyroX, sample.gyroY, sample.gyroZ))
         put("accelerometer", vector(sample.accelX, sample.accelY, sample.accelZ))
-        sample.speedKmh?.let { put("velocity", JSONObject().put("speed", round(it))) }
+        sample.speedKmh?.let { put("velocity", JSONObject().put("speed", round(it, 1))) }
         put("gps", JSONObject().apply {
-            sample.latitude?.let { put("latitude", round(it)) }
-            sample.longitude?.let { put("longitude", round(it)) }
+            sample.latitude?.let { put("latitude", round(it, 5)) }
+            sample.longitude?.let { put("longitude", round(it, 5)) }
         })
     }
 
     private fun vector(x: Double, y: Double, z: Double) = JSONObject()
-        .put("x", round(x))
-        .put("y", round(y))
-        .put("z", round(z))
+        .put("x", round(x, 3))
+        .put("y", round(y, 3))
+        .put("z", round(z, 3))
 
-    private fun round(value: Double) = Math.round(value * 100) / 100.0
+    private fun round(value: Double, digits: Int): Double {
+        val factor = Math.pow(10.0, digits.toDouble())
+        return Math.round(value * factor) / factor
+    }
 }
