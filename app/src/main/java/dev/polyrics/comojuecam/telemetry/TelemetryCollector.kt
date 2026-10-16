@@ -10,6 +10,7 @@ import android.location.LocationListener
 import android.location.LocationManager
 import android.os.Handler
 import java.util.concurrent.ConcurrentLinkedQueue
+import kotlin.math.abs
 
 class TelemetryCollector(
     context: Context,
@@ -18,8 +19,8 @@ class TelemetryCollector(
 ) : SensorEventListener, LocationListener {
     private val sensorManager = context.getSystemService(SensorManager::class.java)
     private val locationManager = context.getSystemService(LocationManager::class.java)
-    private val gyroAverage = SensorAverage()
-    private val accelAverage = SensorAverage()
+    private val gyroPeak = SensorPeak()
+    private val accelPeak = SensorPeak()
     private var lastLocation: Location? = null
     val samples = ConcurrentLinkedQueue<TelemetrySample>()
 
@@ -54,8 +55,8 @@ class TelemetryCollector(
 
     override fun onSensorChanged(event: SensorEvent) {
         when (event.sensor.type) {
-            Sensor.TYPE_GYROSCOPE -> gyroAverage.add(event.values)
-            Sensor.TYPE_ACCELEROMETER -> accelAverage.add(event.values)
+            Sensor.TYPE_GYROSCOPE -> gyroPeak.add(event.values)
+            Sensor.TYPE_ACCELEROMETER -> accelPeak.add(event.values)
         }
     }
 
@@ -79,8 +80,8 @@ class TelemetryCollector(
     }
 
     private fun publishSample() {
-        val gyro = gyroAverage.averageAndReset()
-        val accel = accelAverage.averageAndReset()
+        val gyro = gyroPeak.readAndReset()
+        val accel = accelPeak.readAndReset()
         val location = lastLocation
         samples.add(
             TelemetrySample(
@@ -94,23 +95,22 @@ class TelemetryCollector(
         )
     }
 
-    private class SensorAverage {
-        private val sum = DoubleArray(3)
-        private val last = DoubleArray(3)
-        private var count = 0
+    private class SensorPeak {
+        private val peak = DoubleArray(3)
+        private var seen = false
 
         fun add(values: FloatArray) {
-            for (index in 0..2) sum[index] += values[index].toDouble()
-            count++
+            for (index in 0..2) {
+                val value = values[index].toDouble()
+                if (!seen || abs(value) > abs(peak[index])) peak[index] = value
+            }
+            seen = true
         }
 
-        fun averageAndReset(): DoubleArray {
-            if (count > 0) {
-                for (index in 0..2) last[index] = sum[index] / count
-                sum.fill(0.0)
-                count = 0
-            }
-            return last.copyOf()
+        fun readAndReset(): DoubleArray {
+            if (!seen) return DoubleArray(3)
+            seen = false
+            return peak.copyOf()
         }
     }
 }
