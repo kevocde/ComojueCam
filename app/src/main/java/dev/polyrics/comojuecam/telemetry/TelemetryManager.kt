@@ -35,7 +35,6 @@ class TelemetryManager(context: Context, private val settings: TelemetrySettings
         collector?.publishNow()
         flush()
         collector?.stop()
-        sender?.close()
         collector = null
         sender = null
     }
