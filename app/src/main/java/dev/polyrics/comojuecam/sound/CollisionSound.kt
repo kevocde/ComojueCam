@@ -1,4 +1,4 @@
-package dev.polyrics.mondafono.sound
+package dev.polyrics.comojuecam.sound
 
 import android.media.AudioManager
 import android.media.ToneGenerator

@@ -1,4 +1,4 @@
-package dev.polyrics.mondafono.storage
+package dev.polyrics.comojuecam.storage
 
 import android.Manifest
 import android.content.ContentValues
@@ -8,7 +8,7 @@ import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import java.io.File
-import dev.polyrics.mondafono.recording.LoopRecording
+import dev.polyrics.comojuecam.recording.LoopRecording
 
 class RecordingStorage(private val context: Context) {
     fun requiresLegacyPermission(): Boolean = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q
@@ -25,7 +25,7 @@ class RecordingStorage(private val context: Context) {
         }
         val directory = File(
             Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES),
-            "Mondafono"
+            "ComojueCam"
         )
         directory.mkdirs()
         val file = File(directory, recording.fileName)
@@ -34,7 +34,7 @@ class RecordingStorage(private val context: Context) {
     }
 
     private fun saveWithMediaStore(recording: LoopRecording): String? {
-        val relativePath = "${Environment.DIRECTORY_MOVIES}/Mondafono"
+        val relativePath = "${Environment.DIRECTORY_MOVIES}/ComojueCam"
         val values = ContentValues().apply {
             put(MediaStore.Video.Media.DISPLAY_NAME, recording.fileName)
             put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")

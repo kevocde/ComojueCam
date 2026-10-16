@@ -1,4 +1,4 @@
-package dev.polyrics.mondafono.recording
+package dev.polyrics.comojuecam.recording
 
 data class VideoSize(val width: Int, val height: Int) {
     override fun toString() = "${width}x${height}"
