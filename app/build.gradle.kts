@@ -2,6 +2,8 @@ plugins {
     alias(libs.plugins.android.application)
 }
 
+val telemetryUrl = System.getenv("TELEMETRY_URL") ?: "ws://10.0.2.2:8080"
+
 android {
     namespace = "dev.polyrics.comojuecam"
     compileSdk {
@@ -10,11 +12,16 @@ android {
 
     defaultConfig {
         applicationId = "dev.polyrics.comojuecam"
-        minSdk = 24
+        minSdk = 33
         targetSdk = 37
         versionCode = 1
         versionName = "1.0"
 
+        buildConfigField("String", "TELEMETRY_URL", "\"$telemetryUrl\"")
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     buildTypes {
