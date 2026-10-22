@@ -104,17 +104,23 @@ class LoopVideoRecorder(
         codec.start()
         metrics?.recordOperation("codecStart", System.nanoTime() - startTime)
         var lastPresentationTimeUs = 0L
+        val backoff = AdaptiveBackoff()
         thread = Thread {
             val info = MediaCodec.BufferInfo()
             while (true) {
+                val timeout = backoff.nextTimeout()
                 val dequeueStart = System.nanoTime()
-                val index = codec.dequeueOutputBuffer(info, 10_000)
+                val index = codec.dequeueOutputBuffer(info, timeout)
                 val dequeueDuration = System.nanoTime() - dequeueStart
                 metrics?.recordOperation("dequeueOutput", dequeueDuration)
                 when (index) {
                     MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> outputFormat = codec.outputFormat
-                    MediaCodec.INFO_TRY_AGAIN_LATER -> metrics?.incrementCounter("dequeueRetries")
+                    MediaCodec.INFO_TRY_AGAIN_LATER -> {
+                        backoff.onRetry()
+                        metrics?.incrementCounter("dequeueRetries")
+                    }
                     else -> if (index >= 0) {
+                        backoff.onSuccess()
                         val buffer = codec.getOutputBuffer(index)
                         if (info.size > 0 && buffer != null &&
                             info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG == 0
