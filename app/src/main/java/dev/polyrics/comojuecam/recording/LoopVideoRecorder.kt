@@ -98,13 +98,17 @@ class LoopVideoRecorder(
 
     fun start() {
         codec.start()
+        var lastPresentationTimeUs = 0L
+        val backoff = AdaptiveBackoff()
         thread = Thread {
             val info = MediaCodec.BufferInfo()
             while (true) {
-                when (val index = codec.dequeueOutputBuffer(info, 10_000)) {
+                val index = codec.dequeueOutputBuffer(info, backoff.nextTimeout())
+                when (index) {
                     MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> outputFormat = codec.outputFormat
-                    MediaCodec.INFO_TRY_AGAIN_LATER -> Unit
+                    MediaCodec.INFO_TRY_AGAIN_LATER -> backoff.onRetry()
                     else -> if (index >= 0) {
+                        backoff.onSuccess()
                         val buffer = codec.getOutputBuffer(index)
                         if (info.size > 0 && buffer != null &&
                             info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG == 0
@@ -112,6 +116,7 @@ class LoopVideoRecorder(
                             buffer.position(info.offset)
                             val data = ByteArray(info.size)
                             buffer.get(data)
+                            lastPresentationTimeUs = info.presentationTimeUs
                             appendSample(EncodedSample(data, info.presentationTimeUs, info.flags))
                         }
                         codec.releaseOutputBuffer(index, false)
