@@ -11,9 +11,11 @@ import android.hardware.camera2.CameraManager
 import android.hardware.camera2.CaptureRequest
 import android.os.Handler
 import android.os.HandlerThread
+import android.util.Log
 import android.util.Range
 import android.view.Surface
 import android.view.SurfaceHolder
+import dev.polyrics.comojuecam.profiling.PerformanceMetrics
 import dev.polyrics.comojuecam.recording.LoopRecording
 import dev.polyrics.comojuecam.recording.LoopVideoRecorder
 import dev.polyrics.comojuecam.recording.RecordingStopResult
@@ -30,6 +32,7 @@ class CameraController(
     private val manager = context.getSystemService(CameraManager::class.java)
     private val thread = HandlerThread("camera").apply { start() }
     private val handler = Handler(thread.looper)
+    private val metrics = PerformanceMetrics()
     private val collisionDetector = CollisionDetector(context, ::handleCollision) { gForce ->
         onGForceChanged?.invoke(gForce)
     }
@@ -100,7 +103,12 @@ class CameraController(
         thread.quitSafely()
     }
 
+    fun dumpMetrics() {
+        Log.d(TAG, metrics.toLog())
+    }
+
     private fun open() {
+        val startTime = System.nanoTime()
         try {
             cameraId = manager.cameraIdList.first { id ->
                 manager.getCameraCharacteristics(id).get(CameraCharacteristics.LENS_FACING) ==
@@ -109,6 +117,7 @@ class CameraController(
             updateCapabilities()
             manager.openCamera(cameraId, object : CameraDevice.StateCallback() {
                 override fun onOpened(device: CameraDevice) {
+                    metrics.recordOperation("cameraOpen", System.nanoTime() - startTime)
                     camera = device
                     createSession(null)
                 }
@@ -147,13 +156,15 @@ class CameraController(
 
     private fun startRecording() {
         if (camera == null || recording) return
+        val startTime = System.nanoTime()
         val size = settings.size
         collisionDetector.setSensitivity(settings.collisionSensitivity.gForce)
         recorder = LoopVideoRecorder(
             size.width,
             size.height,
             settings.frameRate,
-            settings.loopDurationSeconds
+            settings.loopDurationSeconds,
+            metrics
         )
         recorder!!.start()
         previewEnabled = true
@@ -161,11 +172,13 @@ class CameraController(
         createSession(recorder!!.inputSurface)
         recording = true
         collisionDetector.start()
+        metrics.recordOperation("startRecording", System.nanoTime() - startTime)
         state(true)
     }
 
     private fun stopRecording(resumePreview: Boolean = true, askToSave: Boolean = true) {
         if (!recording) return
+        val startTime = System.nanoTime()
         val incidentWasActive = incidentCaptureActive
         recording = false
         collisionDetector.stop()
@@ -178,6 +191,7 @@ class CameraController(
         previewEnabled = true
         val stopResult = recorder?.stop() ?: RecordingStopResult(null, emptyList())
         recorder = null
+        metrics.recordOperation("stopRecording", System.nanoTime() - startTime)
         if (resumePreview && holder.surface.isValid) createSession(null)
         if (!askToSave) return
         if (incidentWasActive) {
@@ -190,12 +204,14 @@ class CameraController(
 
     private fun createSession(encoder: Surface?) {
         val device = camera ?: return
+        val startTime = System.nanoTime()
         try {
             val surfaces = listOfNotNull(holder.surface, encoder)
             if (!holder.surface.isValid) return
             encoderSurface = encoder
             device.createCaptureSession(surfaces, object : CameraCaptureSession.StateCallback() {
                 override fun onConfigured(value: CameraCaptureSession) {
+                    metrics.recordOperation("createSession", System.nanoTime() - startTime)
                     session = value
                     updateRepeatingRequest(value)
                 }
@@ -255,5 +271,9 @@ class CameraController(
         session = null
         camera = null
         encoderSurface = null
+    }
+
+    companion object {
+        private const val TAG = "CameraController"
     }
 }
