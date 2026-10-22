@@ -4,7 +4,9 @@ import android.media.MediaCodec
 import android.media.MediaCodecInfo
 import android.media.MediaFormat
 import android.media.MediaMuxer
+import android.util.Log
 import android.view.Surface
+import dev.polyrics.comojuecam.profiling.PerformanceMetrics
 import java.io.File
 import java.io.FileDescriptor
 import java.nio.ByteBuffer
@@ -74,7 +76,8 @@ class LoopVideoRecorder(
     private val width: Int,
     private val height: Int,
     private val frameRate: Int,
-    private val durationSeconds: Int
+    private val durationSeconds: Int,
+    private val metrics: PerformanceMetrics? = null
 ) {
     private val codec = MediaCodec.createEncoderByType("video/avc")
     private val format = MediaFormat.createVideoFormat("video/avc", width, height).apply {
@@ -97,13 +100,20 @@ class LoopVideoRecorder(
     }
 
     fun start() {
+        val startTime = System.nanoTime()
         codec.start()
+        metrics?.recordOperation("codecStart", System.nanoTime() - startTime)
+        var lastPresentationTimeUs = 0L
         thread = Thread {
             val info = MediaCodec.BufferInfo()
             while (true) {
-                when (val index = codec.dequeueOutputBuffer(info, 10_000)) {
+                val dequeueStart = System.nanoTime()
+                val index = codec.dequeueOutputBuffer(info, 10_000)
+                val dequeueDuration = System.nanoTime() - dequeueStart
+                metrics?.recordOperation("dequeueOutput", dequeueDuration)
+                when (index) {
                     MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> outputFormat = codec.outputFormat
-                    MediaCodec.INFO_TRY_AGAIN_LATER -> Unit
+                    MediaCodec.INFO_TRY_AGAIN_LATER -> metrics?.incrementCounter("dequeueRetries")
                     else -> if (index >= 0) {
                         val buffer = codec.getOutputBuffer(index)
                         if (info.size > 0 && buffer != null &&
@@ -112,6 +122,11 @@ class LoopVideoRecorder(
                             buffer.position(info.offset)
                             val data = ByteArray(info.size)
                             buffer.get(data)
+                            if (lastPresentationTimeUs > 0) {
+                                val intervalUs = info.presentationTimeUs - lastPresentationTimeUs
+                                metrics?.recordFrameInterval(intervalUs * 1000L)
+                            }
+                            lastPresentationTimeUs = info.presentationTimeUs
                             appendSample(EncodedSample(data, info.presentationTimeUs, info.flags))
                         }
                         codec.releaseOutputBuffer(index, false)
@@ -148,6 +163,7 @@ class LoopVideoRecorder(
     }
 
     fun stop(): RecordingStopResult {
+        val startTime = System.nanoTime()
         var result: RecordingStopResult? = null
         try {
             codec.signalEndOfInputStream()
@@ -167,13 +183,21 @@ class LoopVideoRecorder(
             codec.stop()
             codec.release()
         }
+        metrics?.recordOperation("recorderStop", System.nanoTime() - startTime)
+        metrics?.let { Log.d(TAG, it.toLog()) }
         return result ?: RecordingStopResult(null, emptyList())
     }
 
     private fun trimSamples(latestPresentationTimeUs: Long) {
         val cutoff = latestPresentationTimeUs - maxDurationUs
+        var trimmed = 0
         while (samples.size > 1 && samples.first().presentationTimeUs < cutoff) {
             samples.removeFirst()
+            trimmed++
+        }
+        if (trimmed > 0) {
+            metrics?.incrementCounter("samplesTrimmed")
+            metrics?.recordGauge("trimmedPerOp", trimmed.toLong())
         }
     }
 
@@ -182,6 +206,7 @@ class LoopVideoRecorder(
         synchronized(bufferLock) {
             samples.addLast(sample)
             trimSamples(sample.presentationTimeUs)
+            metrics?.recordGauge("bufferSize", samples.size.toLong())
             completedCaptures = incidentCaptures.filter { it.append(sample) }
             incidentCaptures.removeAll(completedCaptures.toSet())
         }
@@ -212,5 +237,9 @@ class LoopVideoRecorder(
         fun toRecording(format: MediaFormat): LoopRecording {
             return LoopRecording(format, samples, durationSeconds, "incient_")
         }
+    }
+
+    companion object {
+        private const val TAG = "LoopVideoRecorder"
     }
 }
